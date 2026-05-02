@@ -1,0 +1,46 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Angular
+/dist/
+/tmp/
+/out-tsc/
+/.angular/
+/.angular/cache
+
+# Environment & Config
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Logs
+logs
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.swp
+
+# Coverage & Testing
+coverage/
+*.lcov
+
+# Build & Deployment
+build/
+dist/
+.aws-sam/
+serverless/
