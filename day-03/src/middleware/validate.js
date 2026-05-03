@@ -33,3 +33,62 @@ export function validateTicketInput(req, res, next) {
   req.body.text = text.trim();
   next();
 }
+
+export function validateBulkTicketInput(req, res, next) {
+  const { tickets } = req.body;
+
+  if (!Array.isArray(tickets)) {
+    return res.status(400).json({
+      success: false,
+      errors: ['tickets must be an array']
+    });
+  }
+
+  if (tickets.length === 0) {
+    return res.status(400).json({
+      success: false,
+      errors: ['tickets must contain at least 1 item']
+    });
+  }
+
+  if (tickets.length > 5) {
+    return res.status(400).json({
+      success: false,
+      errors: ['tickets must not contain more than 5 items']
+    });
+  }
+
+  const errors = [];
+  const sanitizedTickets = [];
+
+  tickets.forEach((ticket, index) => {
+    if (typeof ticket !== 'string') {
+      errors.push(`tickets[${index}] must be a string`);
+      return;
+    }
+
+    const trimmedTicket = ticket.trim();
+
+    if (trimmedTicket.length < 10) {
+      errors.push(`tickets[${index}] must be at least 10 characters`);
+      return;
+    }
+
+    if (trimmedTicket.length > 2000) {
+      errors.push(`tickets[${index}] must not exceed 2000 characters`);
+      return;
+    }
+
+    sanitizedTickets.push(trimmedTicket);
+  });
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      errors
+    });
+  }
+
+  req.body.tickets = sanitizedTickets;
+  next();
+}
