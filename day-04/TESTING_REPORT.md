@@ -77,7 +77,7 @@ curl -X POST http://localhost:3000/api/chat/stream \
 
 **.env file** (already set up):
 ```
-GEMINI_API_KEY=AIzaSyB4o4mRMeodWDM_Ubiw21rWTnvKTWGsq3E
+GEMINI_API_KEY=
 AI_PROVIDER=gemini          # switch to "ollama" for local
 PORT=3000
 ```
