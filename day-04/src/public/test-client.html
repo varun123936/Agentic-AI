@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI Stream Test</title>
+  <style>
+    body { font-family: monospace; max-width: 800px; margin: 40px auto; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+    h2 { color: #7eb8f7; }
+    textarea { width: 100%; height: 80px; background: #2a2a2a; color: #fff; border: 1px solid #444; padding: 10px; font-size: 14px; border-radius: 6px; }
+    button { margin-top: 10px; padding: 10px 24px; background: #4a90e2; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    button:disabled { background: #555; cursor: not-allowed; }
+    #response { margin-top: 20px; padding: 16px; background: #2a2a2a; border-radius: 6px; min-height: 100px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; line-height: 1.6; border-left: 3px solid #4a90e2; }
+    #status { margin-top: 10px; font-size: 12px; color: #888; }
+    #latency { color: #7eb8f7; }
+  </style>
+</head>
+<body>
+  <h2>🤖 AI Streaming Test Client</h2>
+
+  <textarea id="message" placeholder="Type your message here...">Explain how Node.js event loop works in simple terms.</textarea>
+  <br>
+  <button id="sendBtn">Send Message</button>
+
+  <div id="response">Response will appear here...</div>
+  <div id="status"></div>
+
+  <script>
+    let startTime;
+    let buffer = '';  // Buffer for incomplete SSE messages
+    let fullResponse = '';  // Accumulate full response text
+
+    async function checkServerHealth() {
+      try {
+        const response = await fetch('/health');
+        const data = await response.json();
+        console.log('✅ Server is running:', data);
+        return true;
+      } catch (error) {
+        console.error('❌ Server is not running:', error);
+        return false;
+      }
+    }
+
+    async function sendMessage() {
+      const message = document.getElementById('message').value.trim();
+      const responseDiv = document.getElementById('response');
+      const statusDiv = document.getElementById('status');
+      const btn = document.getElementById('sendBtn');
+
+      if (!message) {
+        statusDiv.textContent = '⚠️ Please enter a message';
+        return;
+      }
+
+      // Reset UI
+      responseDiv.textContent = '';
+      statusDiv.textContent = 'Checking server...';
+      btn.disabled = true;
+      buffer = '';  // Clear buffer
+      fullResponse = '';  // Clear full response
+      startTime = Date.now();
+
+      try {
+        // Check if server is running
+        const serverOk = await checkServerHealth();
+        if (!serverOk) {
+          responseDiv.textContent = 'Error: Server is not running. Please start the server first.';
+          statusDiv.textContent = '❌ Server offline';
+          return;
+        }
+
+        statusDiv.textContent = 'Sending request...';
+        console.log('📤 Sending message:', message);
+
+        // Use fetch with streaming reader
+        const response = await fetch('/api/chat/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+
+        console.log('Response status:', response.status, response.statusText);
+
+        if (!response.ok) {
+          let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+          try {
+            const err = await response.json();
+            errorMsg += ` - ${err.error || JSON.stringify(err)}`;
+          } catch (e) {
+            const text = await response.text();
+            if (text) errorMsg += ` - ${text}`;
+          }
+          responseDiv.textContent = `Error: ${errorMsg}`;
+          statusDiv.textContent = '❌ Request failed';
+          console.error('Request error:', errorMsg);
+          return;
+        }
+
+        statusDiv.textContent = '📡 Streaming...';
+        console.log('✅ Stream connected, waiting for data...');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let chunkCount = 0;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            console.log('✅ Stream ended');
+            break;
+          }
+
+          chunkCount++;
+          // Decode the chunk
+          const text = decoder.decode(value, { stream: true });
+          console.log(`📦 Chunk ${chunkCount}:`, text.substring(0, 50) + '...');
+          buffer += text;
+
+          // Split by double newline to get complete SSE messages
+          const messages = buffer.split('\n\n');
+          
+          // Keep the last incomplete message in buffer
+          buffer = messages[messages.length - 1];
+
+          // Process all complete messages
+          for (let i = 0; i < messages.length - 1; i++) {
+            const lines = messages[i].split('\n');
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              if (!line.startsWith('data: ')) continue;
+
+              const jsonStr = line.replace('data: ', '').trim();
+              if (!jsonStr) continue;
+
+              try {
+                const parsed = JSON.parse(jsonStr);
+                console.log('📝 Parsed:', parsed.type, parsed.chunk ? parsed.chunk.substring(0, 30) + '...' : '');
+
+                if (parsed.type === 'chunk') {
+                  // Accumulate chunk in both variables
+                  fullResponse += parsed.chunk;
+                  responseDiv.textContent = fullResponse;
+                  // Auto-scroll to bottom
+                  responseDiv.scrollTop = responseDiv.scrollHeight;
+                }
+
+                if (parsed.type === 'done') {
+                  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                  statusDiv.innerHTML = `✅ Done in <span id="latency">${elapsed}s</span> — ${parsed.totalChars} chars`;
+                  console.log('✅ Stream complete!');
+                }
+
+                if (parsed.type === 'error') {
+                  responseDiv.textContent += `\n\n[ERROR] ${parsed.message}`;
+                  statusDiv.textContent = '❌ Stream error';
+                  console.error('Stream error:', parsed.message);
+                }
+              } catch(e) {
+                console.warn('Failed to parse JSON:', jsonStr.substring(0, 50), e.message);
+              }
+            }
+          }
+        }
+
+      } catch (error) {
+        responseDiv.textContent = `Connection error: ${error.message}`;
+        statusDiv.textContent = '❌ Failed';
+        console.error('Connection error:', error);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // Check server on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('🚀 Test client loaded');
+      checkServerHealth();
+      
+      // Add event listeners
+      document.getElementById('sendBtn').addEventListener('click', sendMessage);
+      document.getElementById('message').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+    });
+  </script>
+</body>
+</html>
