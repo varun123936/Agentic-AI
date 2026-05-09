@@ -4,6 +4,7 @@
 import { Conversation } from '../models/conversation.model.js';
 import { Message } from '../models/message.model.js';
 import { AiUsage } from '../models/aiUsage.model.js';
+import { streamAI } from './ai.stream.js';
 
 // ─── Create a new conversation ───────────────────────────────
 export async function createConversation(userId) {
@@ -32,7 +33,7 @@ export async function getUserConversations(userId) {
   return Conversation.find({ userId, status: 'active' })
     .sort({ lastMessageAt: -1 })   // Most recent first
     .limit(50)
-    .select('title messageCount totalTokensUsed lastMessageAt createdAt');
+    .select('title messageCount totalTokensUsed lastMessageAt createdAt summary');
 }
 
 // ─── Load message history for AI context ─────────────────────
@@ -150,5 +151,90 @@ export async function getUserUsageStats(userId) {
     }
   ]);
 
+
   return stats;
+}
+
+// ─── Summarize a conversation ─────────────────────────────────
+export async function summarizeConversation(conversationId, userId) {
+  // 1. Get conversation (validates ownership)
+  const conversation = await getConversation(conversationId, userId);
+
+  // 2. Get all messages from conversation
+  const messages = await Message.find({ conversationId })
+    .sort({ createdAt: 1 })
+    .select('role content createdAt');
+
+  if (messages.length === 0) {
+    throw new Error('No messages to summarize');
+  }
+
+  // 3. Format conversation for AI
+  const conversationText = messages
+    .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+    .join('\n\n');
+
+  // 4. Create summarization prompt
+  const summaryPrompt = `Please summarize the following conversation in exactly 3 bullet points. Focus on the main topics discussed and key insights shared. Keep each bullet point concise but informative.
+
+Conversation:
+${conversationText}
+
+Summary (3 bullet points):`;
+
+  // 5. Call AI to generate summary
+  let summary = '';
+  let aiMetadata = null;
+
+  try {
+    await new Promise((resolve, reject) => {
+      streamAI(
+        'You are a helpful assistant that creates clear, concise summaries.',
+        [], // No history for summarization
+        summaryPrompt, // Use the summary prompt as the new message
+        // onChunk
+        (chunk) => {
+          summary += chunk;
+        },
+        // onDone
+        (metadata) => {
+          aiMetadata = metadata;
+          resolve();
+        },
+        // onError
+        (error) => {
+          reject(error);
+        },
+        undefined // no abort signal needed
+      );
+    });
+  } catch (error) {
+    throw new Error(`Failed to generate summary: ${error.message}`);
+  }
+
+  // 6. Save summary to conversation
+  conversation.summary = summary.trim();
+  await conversation.save();
+
+  // 7. Track this as AI usage (optional - for analytics)
+  if (aiMetadata) {
+    await AiUsage.create({
+      conversationId,
+      userId,
+      provider: 'gemini', // Assuming Gemini for summarization
+      model: 'gemini-2.5-flash',
+      inputTokens: aiMetadata.inputTokens || 0,
+      outputTokens: aiMetadata.outputTokens || 0,
+      totalTokens: (aiMetadata.inputTokens || 0) + (aiMetadata.outputTokens || 0),
+      estimatedCostUsd: 0, // Summaries are typically free/low cost
+      isFree: false,
+      operation: 'summarize' // Custom field to track summarization usage
+    });
+  }
+
+  return {
+    summary: summary.trim(),
+    messageCount: messages.length,
+    tokensUsed: aiMetadata ? (aiMetadata.inputTokens + aiMetadata.outputTokens) : 0
+  };
 }

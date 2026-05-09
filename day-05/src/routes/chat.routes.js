@@ -165,4 +165,16 @@ router.get('/usage', async (req, res) => {
   }
 });
 
+// ── POST /api/chat/conversations/:id/summarize — summarize conversation
+router.post('/conversations/:id/summarize', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] || 'anonymous';
+    const summary = await ConversationService.summarizeConversation(req.params.id, userId);
+    res.json({ success: true, data: summary });
+  } catch (error) {
+    const statusCode = error.message.includes('not found') ? 404 : 500;
+    res.status(statusCode).json({ success: false, error: error.message });
+  }
+});
+
 export default router;

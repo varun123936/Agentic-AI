@@ -28,7 +28,10 @@ const aiUsageSchema = new mongoose.Schema({
   estimatedCostUsd: { type: Number, default: 0 },
 
   // For Ollama — always 0 cost but track usage
-  isFree: { type: Boolean, default: false }
+  isFree: { type: Boolean, default: false },
+
+  // Optional: Track what operation this usage was for
+  operation: { type: String, default: 'chat' }  // chat | summarize | etc
 
 }, {
   timestamps: true
