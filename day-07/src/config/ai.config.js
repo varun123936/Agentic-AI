@@ -20,8 +20,11 @@ if (provider === 'gemini' && !geminiApiKey) {
   throw new Error('GEMINI_API_KEY is required in .env when AI_PROVIDER=gemini');
 }
 
+const providerModel = provider === 'gemini' ? 'gemini-2.5-flash' : 'llama3.2';
+
 export const AI_CONFIG = {
   provider,
+  model: providerModel,
   port,
   corsOrigin,
 

@@ -1,25 +1,10 @@
 import express from 'express';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/user.model.js';
 import { authenticate } from '../middleware/auth.middleware.js';
+import { authRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
-
-// Strict rate limit on auth endpoints — prevents brute force attacks
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,   // 15 minutes
-  max: 10,                     // 10 attempts per 15 min per IP
-  standardHeaders: true,
-  legacyHeaders: false,
-  // ipKeyGenerator(ip) normalises IPv6 to /56 subnet to prevent bypass via address rotation
-  keyGenerator: (req) => ipKeyGenerator(req.ip ?? '127.0.0.1'),
-  message: {
-    success: false,
-    error: 'Too many attempts. Try again in 15 minutes.',
-    code: 'AUTH_RATE_LIMIT_EXCEEDED'
-  }
-});
 
 // Helper: generate a signed JWT for a user ID
 function generateToken(userId) {
@@ -31,7 +16,7 @@ function generateToken(userId) {
 }
 
 // ── POST /api/auth/register ───────────────────────────────────
-router.post('/register', authLimiter, async (req, res) => {
+router.post('/register', authRateLimiter, async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
@@ -78,7 +63,7 @@ router.post('/register', authLimiter, async (req, res) => {
 });
 
 // ── POST /api/auth/login ──────────────────────────────────────
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', authRateLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 

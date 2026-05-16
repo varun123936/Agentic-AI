@@ -4,6 +4,7 @@ import * as ConversationService from '../services/conversation.service.js';
 import { authenticate, checkTokenBudget } from '../middleware/auth.middleware.js';
 import { AI_CONFIG } from '../config/ai.config.js';
 import { User } from '../models/user.model.js';
+import { streamRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = express.Router();
 
@@ -50,6 +51,7 @@ router.get('/conversations/:id/messages', async (req, res) => {
 // authenticate → checkTokenBudget → stream
 router.post(
   '/conversations/:id/stream',
+  streamRateLimiter,
   checkTokenBudget,              // Check daily token budget before AI call
   async (req, res) => {
     const { message } = req.body;
@@ -106,7 +108,7 @@ router.post(
             await ConversationService.saveAssistantMessage(
               conversationId, userId, fullResponse,
               {
-                model: 'gemini-2.5-flash',
+                model: AI_CONFIG.model,
                 provider: AI_CONFIG.provider,
                 inputTokens, outputTokens, latencyMs
               }

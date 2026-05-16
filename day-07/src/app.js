@@ -9,6 +9,7 @@ import { aiRateLimiter } from './middleware/rateLimiter.js';
 import authRoutes from './routes/auth.routes.js';
 import chatRoutes from './routes/chat.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import documentRoutes from './routes/document.routes.js';
 
 const app = express();
 const PORT = AI_CONFIG.port;
@@ -29,6 +30,7 @@ app.use(express.json({ limit: '10kb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', aiRateLimiter, chatRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/documents', documentRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', provider: process.env.AI_PROVIDER });
@@ -49,26 +51,32 @@ app.use(errorHandler);
 // ── Start server ──────────────────────────────────────────────
 connectDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`\n🚀 Server running at: http://localhost:${PORT}`);
-    console.log(`🤖 AI Provider:       ${process.env.AI_PROVIDER || 'gemini'}`);
-    console.log(`🌐 CORS Origin:       ${AI_CONFIG.corsOrigin}`);
-    console.log('\n📡 Available routes:');
-    console.log(`   POST   /api/auth/register`);
-    console.log(`   POST   /api/auth/login`);
-    console.log(`   GET    /api/auth/me`);
-    console.log(`   POST   /api/auth/logout`);
-    console.log(`   POST   /api/chat/conversations`);
-    console.log(`   GET    /api/chat/conversations`);
-    console.log(`   GET    /api/chat/conversations/:id/messages`);
-    console.log(`   POST   /api/chat/conversations/:id/stream`);
-    console.log(`   GET    /api/chat/usage`);
-    console.log(`   GET    /api/admin/users`);
-    console.log(`   GET    /api/admin/usage`);
-    console.log(`   GET    /api/admin/stats`);
-    console.log(`   PATCH  /api/admin/users/:id/token-limit`);
-    console.log(`   GET    /health\n`);
+    console.log(`\nServer running at: http://localhost:${PORT}`);
+    console.log(`AI Provider: ${process.env.AI_PROVIDER || 'gemini'}`);
+    console.log(`CORS Origin: ${AI_CONFIG.corsOrigin}`);
+    console.log('\nAvailable routes:');
+    console.log('  POST   /api/auth/register');
+    console.log('  POST   /api/auth/login');
+    console.log('  GET    /api/auth/me');
+    console.log('  POST   /api/auth/logout');
+    console.log('  POST   /api/chat/conversations');
+    console.log('  GET    /api/chat/conversations');
+    console.log('  GET    /api/chat/conversations/:id/messages');
+    console.log('  POST   /api/chat/conversations/:id/stream');
+    console.log('  GET    /api/chat/usage');
+    console.log('  GET    /api/admin/users');
+    console.log('  GET    /api/admin/usage');
+    console.log('  GET    /api/admin/stats');
+    console.log('  PATCH  /api/admin/users/:id/token-limit');
+    console.log('  POST   /api/documents/upload');
+    console.log('  GET    /api/documents');
+    console.log('  GET    /api/documents/:id');
+    console.log('  POST   /api/documents/:id/chat');
+    console.log('  POST   /api/documents/:id/summarize');
+    console.log('  DELETE /api/documents/:id');
+    console.log('  GET    /health\n');
   });
 }).catch((err) => {
-  console.error('❌ Failed to start server:', err.message);
+  console.error('Failed to start server:', err.message);
   process.exit(1);
 });

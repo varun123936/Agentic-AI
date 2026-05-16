@@ -53,6 +53,7 @@ export const authRateLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true,
 
   keyGenerator: (req) => ipKeyGenerator(req.ip ?? '127.0.0.1'),
 

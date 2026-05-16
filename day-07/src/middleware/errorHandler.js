@@ -41,6 +41,14 @@ export function errorHandler(err, req, res, next) {
     });
   }
 
+  if (err.type === 'entity.parse.failed' || (err instanceof SyntaxError && err.status === 400 && 'body' in err)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Request body contains invalid JSON.',
+      code: 'INVALID_JSON'
+    });
+  }
+
   // ── JSON parse failure from AI output ──────────────────────
   if (err.message?.includes('AI returned invalid JSON')) {
     return res.status(500).json({
