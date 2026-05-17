@@ -138,6 +138,69 @@ ${contextText}
   };
 }
 
+// —— Load multiple documents with ownership validation —————————————
+export async function getDocumentsByIds(documentIds, userId) {
+  if (!Array.isArray(documentIds) || documentIds.length === 0) {
+    const err = new Error('documentIds must be a non-empty array');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const uniqueIds = [...new Set(documentIds)];
+  const documents = [];
+
+  for (const documentId of uniqueIds) {
+    const document = await getDocument(documentId, userId);
+    documents.push(document);
+  }
+
+  return documents;
+}
+
+// —— Build AI prompt for multi-document Q&A ———————————————————————
+export function buildMultiDocumentQAPrompt(documents) {
+  const MAX_CHARS = 800_000;
+  let currentLength = 0;
+  let wasTruncated = false;
+
+  const labeledDocuments = documents.map((document, index) => {
+    const label = `Document ${index + 1}: ${document.originalName}`;
+    const sectionHeader = `${label}\n${'—'.repeat(Math.min(label.length, 60))}\n`;
+    const remainingChars = MAX_CHARS - currentLength - sectionHeader.length;
+
+    let content = document.extractedText || '';
+    if (remainingChars <= 0) {
+      wasTruncated = true;
+      content = '[Document content omitted due to combined length]';
+    } else if (content.length > remainingChars) {
+      wasTruncated = true;
+      content = `${content.substring(0, remainingChars)}\n\n[Document truncated due to combined length]`;
+    }
+
+    currentLength += sectionHeader.length + content.length + 2;
+    return `${sectionHeader}${content}`;
+  });
+
+  return {
+    system: `You are a document analysis assistant.
+You have been given multiple documents.
+Your job is to answer questions accurately using only the provided documents.
+
+Rules:
+- Only answer based on information in the provided documents
+- Clearly mention which document(s) support your answer when helpful
+- If the answer is not in the documents, clearly say "This information is not in the provided documents"
+- If documents disagree, say so explicitly
+- Be concise and direct
+
+Documents:
+═══════════════════════════════════════
+${labeledDocuments.join('\n\n')}
+═══════════════════════════════════════`,
+    wasTruncated
+  };
+}
+
 // ── Soft delete a document ────────────────────────────────────
 export async function deleteDocument(documentId, userId) {
   const document = await Document.findOneAndUpdate(

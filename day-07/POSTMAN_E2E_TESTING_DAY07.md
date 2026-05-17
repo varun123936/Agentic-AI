@@ -68,6 +68,7 @@ Create these variables:
   "user_id": "",
   "conversation_id": "",
   "document_id": "",
+  "document_id_2": "",
   "admin_token": ""
 }
 ```
@@ -558,6 +559,8 @@ Observed response shape:
 
 Save `data.id` -> `document_id`
 
+Upload one more file and save its returned `data.id` into `document_id_2` if you want to test multi-document Q&A.
+
 ### 19. Upload without file
 
 `POST {{base_url}}/api/documents/upload`
@@ -680,7 +683,58 @@ data: {"type":"chunk","content":"## Key Points ..."}
 data: {"type":"done","tokens":{"input":185,"output":137}}
 ```
 
-### 24. Delete document
+### 24. Multi-document chat
+
+Before this test, upload at least two documents and save:
+
+- first document id -> `document_id`
+- second document id -> `document_id_2`
+
+`POST {{base_url}}/api/documents/multi-chat`
+
+Headers:
+
+```text
+Authorization: Bearer {{token}}
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{
+  "documentIds": ["{{document_id}}", "{{document_id_2}}"],
+  "question": "What common project name appears across these documents?"
+}
+```
+
+Expected status: `200`
+
+Expected SSE response shape:
+
+```text
+data: {"type":"chunk","content":"...answer based on multiple documents..."}
+
+data: {"type":"done","tokens":{"input":210,"output":45},"latencyMs":1300,"documents":[{"id":"DOCUMENT_ID_1","name":"file1.txt"},{"id":"DOCUMENT_ID_2","name":"file2.txt"}]}
+```
+
+Behavior:
+
+- validates that all `documentIds` belong to the logged-in user
+- rejects empty `documentIds`
+- rejects more than 10 documents
+- rejects documents that are not ready for questioning
+- labels documents clearly in the AI prompt as `Document 1`, `Document 2`, and so on
+
+Example use case:
+
+- upload `project-overview.txt`
+- upload `meeting-notes.txt`
+- ask: `What common project name appears across these documents?`
+
+If both documents mention `Agentic AI`, the answer should mention that shared name.
+
+### 25. Delete document
 
 `DELETE {{base_url}}/api/documents/{{document_id}}`
 
@@ -695,7 +749,7 @@ Expected body:
 }
 ```
 
-### 25. Get deleted document
+### 26. Get deleted document
 
 `GET {{base_url}}/api/documents/{{document_id}}`
 
@@ -727,7 +781,7 @@ db.users.updateOne(
 
 After that, the same JWT token works for admin routes because the middleware reads the latest role from MongoDB.
 
-### 26. Admin users
+### 27. Admin users
 
 `GET {{base_url}}/api/admin/users`
 
@@ -757,7 +811,7 @@ Observed response contains all users with fields like:
 }
 ```
 
-### 27. Admin usage
+### 28. Admin usage
 
 `GET {{base_url}}/api/admin/usage`
 
@@ -792,7 +846,7 @@ Observed shape:
 }
 ```
 
-### 28. Admin stats
+### 29. Admin stats
 
 `GET {{base_url}}/api/admin/stats`
 
@@ -813,7 +867,7 @@ Observed shape:
 }
 ```
 
-### 29. Admin update token limit
+### 30. Admin update token limit
 
 `PATCH {{base_url}}/api/admin/users/{{user_id}}/token-limit`
 
@@ -856,15 +910,17 @@ Expected body shape:
 6. Chat stream
 7. Usage
 8. Upload document
-9. Document list
-10. Document chat
-11. Document summarize
-12. Delete document
-13. Promote user to admin in MongoDB
-14. Admin users
-15. Admin usage
-16. Admin stats
-17. Admin token limit update
+9. Upload second document
+10. Document list
+11. Document chat
+12. Document summarize
+13. Multi-document chat
+14. Delete document
+15. Promote user to admin in MongoDB
+16. Admin users
+17. Admin usage
+18. Admin stats
+19. Admin token limit update
 
 ## File types accepted for upload
 
@@ -921,6 +977,36 @@ Expected body shape:
   "success": false,
   "error": "Daily token limit reached. Resets at midnight.",
   "code": "TOKEN_BUDGET_EXCEEDED"
+}
+```
+
+### Multi-document validation errors
+
+If `documentIds` is empty:
+
+```json
+{
+  "success": false,
+  "error": "documentIds must be a non-empty array"
+}
+```
+
+If one document does not belong to the authenticated user or does not exist:
+
+```json
+{
+  "success": false,
+  "error": "Document not found"
+}
+```
+
+If one document is not ready:
+
+```json
+{
+  "success": false,
+  "error": "Document \"some-file.txt\" is not ready for questions.",
+  "code": "DOCUMENT_NOT_READY"
 }
 ```
 

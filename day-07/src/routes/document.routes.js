@@ -9,8 +9,10 @@ import {
   extractTextFromFile,
   saveDocument,
   getDocument,
+  getDocumentsByIds,
   getUserDocuments,
   buildDocumentQAPrompt,
+  buildMultiDocumentQAPrompt,
   deleteDocument
 } from '../services/document.service.js';
 import { streamAI } from '../services/ai.stream.js';
@@ -142,6 +144,141 @@ router.get('/:id', async (req, res) => {
 
 // ── POST /api/documents/:id/chat ──────────────────────────────
 // Stream AI answers about a specific document
+router.post(
+  '/multi-chat',
+  streamRateLimiter,
+  async (req, res) => {
+    const { documentIds, question } = req.body;
+
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'documentIds must be a non-empty array'
+      });
+    }
+
+    if (documentIds.length > 10) {
+      return res.status(400).json({
+        success: false,
+        error: 'You can ask about up to 10 documents at a time'
+      });
+    }
+
+    if (!question?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'question is required'
+      });
+    }
+
+    if (question.length > 1000) {
+      return res.status(400).json({
+        success: false,
+        error: 'question must be under 1000 characters'
+      });
+    }
+
+    let documents;
+    try {
+      documents = await getDocumentsByIds(documentIds, req.user.id);
+    } catch (error) {
+      return res.status(error.statusCode || 400).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    const notReadyDocument = documents.find(
+      (document) => document.extractionStatus !== 'done' || !document.extractedText
+    );
+
+    if (notReadyDocument) {
+      return res.status(422).json({
+        success: false,
+        error: `Document "${notReadyDocument.originalName}" is not ready for questions.`,
+        code: 'DOCUMENT_NOT_READY'
+      });
+    }
+
+    const { system: systemPrompt, wasTruncated } = buildMultiDocumentQAPrompt(documents);
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders();
+
+    if (wasTruncated) {
+      res.write(`data: ${JSON.stringify({
+        type: 'warning',
+        message: 'Combined document content was very large and has been partially processed.'
+      })}\n\n`);
+    }
+
+    const controller = new AbortController();
+    req.on('close', () => { controller.abort(); res.end(); });
+
+    const startTime = Date.now();
+    let fullAnswer = '';
+
+    try {
+      await streamAI(
+        systemPrompt,
+        [],
+        question.trim(),
+
+        (chunk) => {
+          fullAnswer += chunk;
+          res.write(`data: ${JSON.stringify({ type: 'chunk', content: chunk })}\n\n`);
+        },
+
+        async ({ inputTokens, outputTokens }) => {
+          const latencyMs = Date.now() - startTime;
+
+          try {
+            await Document.updateMany(
+              { _id: { $in: documents.map((document) => document._id) } },
+              { $inc: { queryCount: 1 } }
+            );
+          } catch (dbErr) {
+            console.error('[DOC MULTI CHAT] Failed to update query counts:', dbErr.message);
+          }
+
+          res.write(`data: ${JSON.stringify({
+            type: 'done',
+            tokens: { input: inputTokens, output: outputTokens },
+            latencyMs,
+            documents: documents.map((document) => ({
+              id: document._id,
+              name: document.originalName
+            }))
+          })}\n\n`);
+          res.end();
+        },
+
+        (error) => {
+          console.error('[DOC MULTI CHAT ERROR]', error.message);
+          if (!res.writableEnded) {
+            res.write(`data: ${JSON.stringify({
+              type: 'error',
+              message: error.message
+            })}\n\n`);
+            res.end();
+          }
+        },
+
+        controller.signal
+      );
+    } catch (error) {
+      console.error('[DOC MULTI CHAT ROUTE ERROR]', error.message);
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'Something went wrong' })}\n\n`);
+        res.end();
+      }
+    }
+  }
+);
+
 router.post(
   '/:id/chat',
   streamRateLimiter,

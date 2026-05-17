@@ -71,6 +71,7 @@ connectDB().then(() => {
     console.log('  POST   /api/documents/upload');
     console.log('  GET    /api/documents');
     console.log('  GET    /api/documents/:id');
+    console.log('  POST   /api/documents/multi-chat');
     console.log('  POST   /api/documents/:id/chat');
     console.log('  POST   /api/documents/:id/summarize');
     console.log('  DELETE /api/documents/:id');
