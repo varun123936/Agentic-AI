@@ -1,7 +1,7 @@
 {
-  "name": "day-07",
+  "name": "day-09",
   "version": "1.0.0",
-  "description": "",
+  "description": "Day 09 AI Chat platform with RAG support",
   "main": "src/app.js",
   "scripts": {
     "dev": "node --watch --import ./src/env.js src/app.js",
@@ -22,6 +22,6 @@
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "pdf-parse": "^1.1.1",
-    "uuid": "^14.0.0"
+    "uuid": "^14.0.1"
   }
 }

@@ -1,4 +1,4 @@
-# Day-06: AI Chat Platform with Authentication & Admin Dashboard
+# Day-09: AI Chat Platform with Document RAG Search
 
 ## 📋 Table of Contents
 1. [Project Overview](#project-overview)
@@ -16,13 +16,16 @@
 
 ## 📚 Project Overview
 
-**Day-06** is an enterprise-grade AI Chat Platform with the following key features:
+**Day-09** is an enterprise-grade AI Chat Platform with embedded Document RAG capabilities and the following key features:
 
 ### Core Features:
 - ✅ User authentication (Register/Login with JWT)
 - ✅ Role-based access control (User/Admin roles)
 - ✅ Daily token budget per user (configurable)
 - ✅ AI-powered chat with Gemini or Ollama
+- ✅ Document upload and text extraction for PDF/chat content
+- ✅ Document RAG search using ChromaDB Cloud and Ollama embeddings
+- ✅ Semantic vector search and knowledge-base driven answer generation
 - ✅ Conversation management (create, archive, list)
 - ✅ Real-time streaming responses (Server-Sent Events)
 - ✅ Usage tracking and analytics
@@ -33,10 +36,13 @@
 ### Tech Stack:
 - **Backend**: Express.js v5.2.1 (Node.js)
 - **Database**: MongoDB with Mongoose v9.6.2
+- **Vector Store**: ChromaDB Cloud via `chromadb`
+- **Embeddings**: Ollama `nomic-embed-text`
 - **Authentication**: JWT (jsonwebtoken v9.0.3)
 - **Password Security**: bcryptjs v3.0.3
 - **Rate Limiting**: express-rate-limit v8.5.1
-- **AI APIs**: Gemini 2.5 Flash or Ollama
+- **File Parsing**: pdf-parse v1.1.1
+- **HTTP Fetch**: node-fetch v3.3.2
 
 ---
 
@@ -101,28 +107,38 @@
 ## 📁 Project Structure
 
 ```
-day-06/
+day-09/
 ├── src/
 │   ├── app.js                           # ← ENTRY POINT: Main application setup
 │   ├── config/
 │   │   ├── db.config.js                 # MongoDB connection
-│   │   └── ai.config.js                 # AI provider configuration
+│   │   ├── ai.config.js                 # AI provider configuration
+│   │   └── chroma.config.js             # Chroma Cloud vector store config
 │   ├── middleware/
 │   │   ├── auth.middleware.js           # JWT verification & role checking
 │   │   ├── errorHandler.js              # Global error handler
-│   │   └── rateLimiter.js               # Rate limiting configuration
+│   │   ├── rateLimiter.js               # Rate limiting configuration
+│   │   └── upload.middleware.js         # File upload validation and error handling
 │   ├── models/
 │   │   ├── user.model.js                # User schema with token budgets
 │   │   ├── conversation.model.js        # Conversation metadata
 │   │   ├── message.model.js             # Individual messages
-│   │   └── aiUsage.model.js             # Usage tracking for billing
+│   │   ├── aiUsage.model.js             # Usage tracking for billing
+│   │   ├── document.model.js            # Uploaded document metadata
+│   │   └── chunk.model.js               # Document chunk metadata for RAG
 │   ├── routes/
 │   │   ├── auth.routes.js               # Authentication endpoints
 │   │   ├── chat.routes.js               # Chat/conversation endpoints
-│   │   └── admin.routes.js              # Admin analytics endpoints
+│   │   ├── admin.routes.js              # Admin analytics endpoints
+│   │   ├── document.routes.js           # Document upload and query endpoints
+│   │   └── rag.routes.js                # RAG indexing and semantic search endpoints
 │   └── services/
 │       ├── conversation.service.js      # Business logic for conversations
-│       └── ai.stream.js                 # AI provider integration (streaming)
+│       ├── ai.stream.js                 # AI provider integration (streaming)
+│       ├── document.service.js          # Document extraction and query support
+│       ├── embedding.service.js         # Ollama embeddings
+│       ├── vectorstore.service.js       # ChromaDB vector store operations
+│       └── rag.service.js               # RAG indexing and retrieval logic
 ├── .env                                 # Environment variables
 ├── package.json                         # Dependencies
 └── PROJECT_DOCUMENTATION.md             # This file!
@@ -610,6 +626,16 @@ data: {"type":"done","tokens":{"input":10,"output":5,"total":15},"latencyMs":234
 | GET | `/stats` | ✅ Admin | Dashboard stats |
 | PATCH | `/users/:id/token-limit` | ✅ Admin | Update user's daily limit |
 
+### RAG Routes (`/api/rag`)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/index/:documentId` | ✅ | Index a processed document into Chroma vector store |
+| POST | `/search` | ✅ | Semantic search for relevant document chunks |
+| POST | `/chat` | ✅ | RAG-powered streaming answer over relevant document chunks |
+| DELETE | `/index/:documentId` | ✅ | Remove document chunks from the vector store |
+| GET | `/stats` | ✅ | Vector store usage and user chunk counts |
+
 ### Health Check
 
 | Method | Endpoint | Auth | Description |
@@ -630,6 +656,9 @@ Create a Postman environment with these variables:
   "auth_token": "",
   "user_id": "",
   "conversation_id": "",
+  "document_id": "",
+  "rag_document_id": "",
+  "rag_query": "",
   "admin_token": ""
 }
 ```
@@ -899,7 +928,177 @@ Authorization: Bearer {{auth_token}}
 
 ---
 
-### **Test 10: Admin - Create Admin User (via DB)**
+### **Test 10: Upload a Document for RAG**
+
+```
+POST {{base_url}}/api/documents/upload
+Authorization: Bearer {{auth_token}}
+Content-Type: multipart/form-data
+```
+
+Form data:
+- `file` → select a local PDF file
+
+**Expected Response** (201 Created):
+```json
+{
+  "success": true,
+  "message": "Document uploaded and processed successfully.",
+  "data": {
+    "id": "507f1f77bcf86cd799439013",
+    "originalName": "example.pdf",
+    "mimeType": "application/pdf",
+    "pageCount": 3,
+    "wordCount": 320,
+    "estimatedTokenCount": 450,
+    "createdAt": "2026-05-09T15:52:44.000Z"
+  }
+}
+```
+
+**Save to Environment**:
+- Copy `data.id` → `document_id`
+
+---
+
+### **Test 11: Index Document into RAG**
+
+```
+POST {{base_url}}/api/rag/index/{{document_id}}
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+```
+
+Body: `{}`
+
+**Expected Response** (200 OK):
+```json
+{
+  "success": true,
+  "message": "Document indexed successfully.",
+  "data": {
+    "documentId": "507f1f77bcf86cd799439013",
+    "documentName": "example.pdf",
+    "chunksCreated": 8,
+    "embeddingProvider": "ollama",
+    "embeddingModel": "nomic-embed-text",
+    "embeddingDimensions": 768
+  }
+}
+```
+
+---
+
+### **Test 12: Search Relevant Chunks**
+
+```
+POST {{base_url}}/api/rag/search
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+```
+
+Body:
+```json
+{
+  "query": "What does the document say about deployment?",
+  "documentId": "{{document_id}}",
+  "topK": 5
+}
+```
+
+**Expected Response** (200 OK):
+```json
+{
+  "success": true,
+  "data": {
+    "query": "What does the document say about deployment?",
+    "resultsFound": 3,
+    "chunks": [
+      {
+        "text": "... brief excerpt from the most relevant chunk ...",
+        "similarityScore": 0.92,
+        "documentName": "example.pdf",
+        "documentId": "507f1f77bcf86cd799439013"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### **Test 13: RAG Chat Query**
+
+```
+POST {{base_url}}/api/rag/chat
+Authorization: Bearer {{auth_token}}
+Content-Type: application/json
+```
+
+Body:
+```json
+{
+  "question": "Summarize the document's guidance on deployment.",
+  "documentId": "{{document_id}}"
+}
+```
+
+**Expected Response** (200 OK with streaming events):
+The response will stream Server-Sent Events with `type: chunk` events followed by a final `type: done` event.
+
+Example streamed events:
+```
+data: {"type":"status","message":"Searching knowledge base..."}
+
+data: {"type":"context_found","chunksFound":3,"sources":[... ]}
+
+data: {"type":"chunk","content":"The document says that deployment should..."}
+
+data: {"type":"done","tokens":{"input":45,"output":120},"latencyMs":1420,"sources":[...],"chunksUsed":3}
+```
+
+---
+Optimized tool selectionI’m turning those three RAG endpoints into a simple, user-friendly explanation with examples.
+
+Here is the simple explanation for each endpoint:
+
+1. POST /api/rag/index/{{document_id}}
+- Purpose: This endpoint takes an uploaded document and prepares it for semantic search.
+- What happens: The document text is split into small chunks, converted into embeddings, and stored in the vector database.
+- Simple meaning: “Make this document searchable by AI.”
+
+Example:
+- You upload a PDF called “Project Guide.pdf”.
+- Then you call this endpoint for that document.
+- Now the system knows the document contents and can search it later.
+
+2. POST /api/rag/search
+- Purpose: This endpoint searches the indexed document for the most relevant parts based on a question or keyword.
+- What happens: It finds the chunks that best match the query and returns them.
+- Simple meaning: “Find the most relevant information from the document.”
+
+Example:
+- You send:
+  - query: “What is the deployment process?”
+- The system returns the most relevant sections from the uploaded document.
+
+3. POST /api/rag/chat
+- Purpose: This endpoint uses the search results to answer the user’s question in a natural language way.
+- What happens: It first finds relevant chunks, then uses those chunks as context to generate an answer.
+- Simple meaning: “Ask a question about the document and get an AI-generated answer from it.”
+
+Example:
+- You send:
+  - question: “Summarize the deployment steps”
+- The system searches the document, finds the relevant text, and replies with an answer based on that text.
+
+In short:
+- Index = store and prepare the document
+- Search = find relevant parts
+- Chat = answer the question using those relevant parts
+
+
+### **Test 14: Admin - Create Admin User (via DB)**
 
 Since we don't have an admin creation endpoint, create directly in MongoDB:
 
@@ -1326,20 +1525,21 @@ Authorization: Bearer {{auth_token}}
 
 ### **Prerequisites**
 - Node.js v20+
-- MongoDB running locally (or adjust MONGODB_URI)
-- Gemini API key (if using Gemini provider)
+- MongoDB running locally or accessible via `MONGODB_URI`
+- Ollama running locally or reachable via `OLLAMA_URL`
+- Chroma Cloud API credentials: `CHROMA_API_KEY`, `CHROMA_TENANT`, `CHROMA_DATABASE`
 
 ### **Setup**
 
 ```bash
-# 1. Navigate to day-06 directory
-cd day-06
+# 1. Navigate to day-09 directory
+cd day-09
 
 # 2. Install dependencies
 npm install
 
 # 3. Create .env file (see .env.example)
-# Set: GEMINI_API_KEY, MONGODB_URI, JWT_SECRET
+# Set: OLLAMA_URL, CHROMA_API_KEY, CHROMA_TENANT, CHROMA_DATABASE, MONGODB_URI, JWT_SECRET
 
 # 4. Start the server
 npm run dev
@@ -1350,8 +1550,12 @@ npm run dev
 ### **Environment Variables**
 
 ```
-GEMINI_API_KEY=your_actual_key_here
-AI_PROVIDER=gemini
+OLLAMA_URL=http://localhost:11434
+OLLAMA_EMBED_MODEL=nomic-embed-text
+CHROMA_API_KEY=your_chroma_api_key_here
+CHROMA_TENANT=your_chroma_tenant_here
+CHROMA_DATABASE=your_chroma_database_here
+AI_PROVIDER=ollama
 MONGODB_URI=mongodb://localhost:27017/ai-course
 JWT_SECRET=your_super_secret_key_change_this_min_32_chars
 JWT_EXPIRES_IN=7d
@@ -1392,7 +1596,7 @@ Use this checklist to verify all features:
 
 ## 🎓 Learning Outcomes
 
-After completing Day-06, you should understand:
+After completing Day-09, you should understand:
 
 1. ✅ JWT-based authentication with Express
 2. ✅ Role-based access control patterns
@@ -1400,16 +1604,16 @@ After completing Day-06, you should understand:
 4. ✅ Token budgeting for API usage
 5. ✅ Error handling middleware
 6. ✅ Server-Sent Events (SSE) for streaming
-7. ✅ Database indexing for performance
-8. ✅ Admin dashboard design
-9. ✅ Usage tracking and analytics
-10. ✅ Enterprise API security practices
+7. ✅ Document extraction and chunking for RAG
+8. ✅ Embedding generation with Ollama
+9. ✅ Vector search with ChromaDB Cloud
+10. ✅ Knowledge-base augmented generation for document QA
 
 ---
 
 ## 📝 Summary
 
-**Day-06** brings all previous concepts together into a production-ready AI chat platform:
+**Day-09** brings all previous concepts together into a production-ready AI chat platform with document RAG search:
 
 - **Authentication** → Users can register, login, get profiles
 - **Authorization** → Different roles (user/admin) with different permissions
@@ -1427,3 +1631,116 @@ This is a **complete, deployable backend** for an AI chat application!
 **End of Documentation**
 
 *Last Updated: May 9, 2026*
+
+RAG Architecture (Simple English)
+                  Upload PDF
+                      │
+                      ▼
+              rag.service.js
+       (Controls complete RAG flow)
+                      │
+          Split PDF into small chunks
+                      │
+                      ▼
+         embedding.service.js
+    (Generate embeddings using Ollama)
+                      │
+      POST /api/embeddings (localhost:11434)
+                      │
+                      ▼
+        Embedding (768-dimensional vector)
+                      │
+          ┌───────────┴───────────┐
+          │                       │
+          ▼                       ▼
+   MongoDB (chunks)         ChromaDB
+ (Chunk metadata)      (Embeddings + Vector Search)
+Purpose of Each File
+1. rag.service.js (Manager / Orchestrator)
+
+Purpose: Controls the complete RAG indexing process.
+
+Responsibilities
+Split PDF into chunks.
+Call embedding.service.js to generate embeddings.
+Prepare chunk data.
+Store metadata in MongoDB.
+Store embeddings in ChromaDB.
+
+It doesn't generate embeddings or talk directly to Ollama or Chroma. It simply coordinates the flow.
+
+2. embedding.service.js (Embedding Generator)
+
+Purpose: Convert text into vector embeddings.
+
+Flow
+Chunk Text
+     │
+     ▼
+POST http://localhost:11434/api/embeddings
+     │
+     ▼
+Ollama (nomic-embed-text)
+     │
+     ▼
+768-dimensional embedding vector
+
+It only generates embeddings. Nothing is stored here.
+
+3. vectorstore.service.js (Vector Database Layer)
+
+Purpose: Communicate with ChromaDB.
+
+Responsibilities
+Store embeddings.
+Search similar chunks.
+Delete chunks.
+Count stored chunks.
+
+It never generates embeddings.
+
+Why MongoDB if ChromaDB already exists?
+MongoDB stores
+documentId
+userId
+chunkId
+chunk text (optional, based on design)
+upload information
+metadata
+
+It is your application's database.
+
+ChromaDB stores
+Embedding vectors
+Chunk text
+Metadata
+Performs similarity search
+
+It is your vector database.
+
+Production Flow
+Upload PDF
+     │
+     ▼
+Split into Chunks
+     │
+     ▼
+Generate Embeddings (Ollama/OpenAI/Gemini)
+     │
+     ▼
+Store Embeddings in ChromaDB
+     │
+     ▼
+Store Metadata in MongoDB
+Production Best Practice
+
+Most companies generate embeddings from their application (using Ollama, OpenAI, Gemini, Voyage AI, etc.) and then send those embeddings to a vector database like ChromaDB.
+
+Application
+      │
+Generate Embeddings
+      │
+      ▼
+Vector Database (ChromaDB)
+
+This approach is flexible because you can change the embedding model later without changing the vector database.

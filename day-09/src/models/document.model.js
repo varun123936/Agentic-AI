@@ -73,6 +73,17 @@ const documentSchema = new mongoose.Schema({
     default: null
   },
 
+  // Document vector index metadata
+  isIndexed: {
+    type: Boolean,
+    default: false
+  },
+
+  indexedAt: {
+    type: Date,
+    default: null
+  },
+
   // How many times this document was queried
   queryCount: {
     type: Number,

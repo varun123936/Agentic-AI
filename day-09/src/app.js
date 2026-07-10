@@ -10,6 +10,8 @@ import authRoutes from './routes/auth.routes.js';
 import chatRoutes from './routes/chat.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import documentRoutes from './routes/document.routes.js';
+import { testChromaConnection } from './config/chroma.config.js';
+import ragRoutes from './routes/rag.routes.js';
 
 const app = express();
 const PORT = AI_CONFIG.port;
@@ -31,6 +33,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/chat', aiRateLimiter, chatRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/rag', ragRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', provider: process.env.AI_PROVIDER });
@@ -49,7 +52,10 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // ── Start server ──────────────────────────────────────────────
-connectDB().then(() => {
+Promise.all([
+  connectDB(),
+  testChromaConnection()
+]).then(() => {
   app.listen(PORT, () => {
     console.log(`\nServer running at: http://localhost:${PORT}`);
     console.log(`AI Provider: ${process.env.AI_PROVIDER || 'gemini'}`);
@@ -69,6 +75,11 @@ connectDB().then(() => {
     console.log('  GET    /api/admin/stats');
     console.log('  PATCH  /api/admin/users/:id/token-limit');
     console.log('  POST   /api/documents/upload');
+    console.log('  POST   /api/rag/index/:documentId');
+    console.log('  POST   /api/rag/search');
+    console.log('  POST   /api/rag/chat');
+    console.log('  DELETE /api/rag/index/:documentId');
+    console.log('  GET    /api/rag/stats');
     console.log('  GET    /api/documents');
     console.log('  GET    /api/documents/:id');
     console.log('  POST   /api/documents/multi-chat');
