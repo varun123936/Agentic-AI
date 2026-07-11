@@ -1,0 +1,311 @@
+<div class="chat-layout">
+
+  <!-- ── Sidebar ──────────────────────────────────────────── -->
+  <aside class="chat-sidebar border-end bg-white">
+
+    <!-- Sidebar header -->
+    <div class="sidebar-header d-flex align-items-center
+                justify-content-between p-3 border-bottom">
+      <h6 class="mb-0 fw-semibold text-dark">
+        <i class="bi bi-chat-square-dots me-2 text-primary"></i>
+        Conversations
+      </h6>
+      <button
+        class="btn btn-primary btn-sm"
+        (click)="createConversation()"
+        [disabled]="isCreatingConversation()"
+        title="New conversation"
+      >
+        @if (isCreatingConversation()) {
+          <span class="spinner-border spinner-border-sm" role="status"></span>
+        } @else {
+          <i class="bi bi-plus-lg"></i>
+        }
+      </button>
+    </div>
+
+    <!-- Conversations list -->
+    <div class="sidebar-list">
+
+      @if (isLoadingConversations()) {
+        <app-loading-spinner message="Loading..." size="sm" />
+      }
+
+      @if (!isLoadingConversations() && conversations().length === 0) {
+        <div class="text-center py-5 px-3">
+          <i class="bi bi-chat-square text-muted"
+             style="font-size: 2rem;"></i>
+          <p class="text-muted small mt-2 mb-3">
+            No conversations yet
+          </p>
+          <button
+            class="btn btn-outline-primary btn-sm"
+            (click)="createConversation()"
+          >
+            Start your first chat
+          </button>
+        </div>
+      }
+
+      @for (conv of conversations(); track conv._id) {
+        <button
+          class="conversation-item w-100 text-start border-0 bg-transparent
+                 px-3 py-3 border-bottom"
+          [class.active]="activeConversation()?._id === conv._id"
+          (click)="selectConversation(conv)"
+        >
+          <div class="d-flex align-items-start gap-2">
+            <div class="conv-icon mt-1">
+              <i class="bi bi-chat-left-text text-primary" style="font-size: 0.85rem;"></i>
+            </div>
+            <div class="flex-grow-1 overflow-hidden">
+              <p class="conv-title mb-0 text-truncate">
+                {{ conv.title || 'New Conversation' }}
+              </p>
+              <div class="d-flex align-items-center gap-2 mt-1">
+                <span class="conv-meta">
+                  <i class="bi bi-chat-dots me-1"></i>
+                  {{ conv.messageCount }} msgs
+                </span>
+                <span class="conv-meta">
+                  <i class="bi bi-cpu me-1"></i>
+                  {{ formatTokens(conv.totalTokensUsed) }} tokens
+                </span>
+              </div>
+            </div>
+          </div>
+        </button>
+      }
+
+    </div>
+  </aside>
+
+  <!-- ── Main chat area ───────────────────────────────────── -->
+  <main class="chat-main d-flex flex-column">
+
+    <!-- No conversation selected -->
+    @if (!activeConversation()) {
+      <div class="flex-grow-1 d-flex align-items-center
+                  justify-content-center text-center p-4">
+        <div>
+          <i class="bi bi-braces-asterisk text-primary"
+             style="font-size: 3rem; opacity: 0.3;"></i>
+          <h5 class="mt-3 text-muted fw-normal">
+            Select a conversation or create a new one
+          </h5>
+          <button
+            class="btn btn-primary mt-3"
+            (click)="createConversation()"
+          >
+            <i class="bi bi-plus-lg me-2"></i>New Chat
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (activeConversation()) {
+
+      <!-- Chat header -->
+      <div class="chat-header d-flex align-items-center
+                  justify-content-between px-4 py-3 border-bottom bg-white">
+        <div>
+          <h6 class="mb-0 fw-semibold">
+            {{ activeConversation()?.title || 'New Conversation' }}
+          </h6>
+          <small class="text-muted">
+            {{ activeConversation()?.messageCount || 0 }} messages
+            &nbsp;·&nbsp;
+            {{ formatTokens(activeConversation()?.totalTokensUsed || 0) }} tokens used
+          </small>
+        </div>
+        <span class="badge bg-success-subtle text-success border border-success-subtle">
+          <i class="bi bi-circle-fill me-1" style="font-size: 0.4rem;"></i>
+          Gemini 2.5 Flash
+        </span>
+      </div>
+
+      <!-- Messages area -->
+      <div
+        #messageContainer
+        class="messages-container flex-grow-1 overflow-y-auto px-4 py-3"
+      >
+
+        @if (isLoadingMessages()) {
+          <app-loading-spinner message="Loading messages..." />
+        }
+
+        <!-- Empty state -->
+        @if (!isLoadingMessages() && messages().length === 0
+             && !streaming().isStreaming) {
+          <div class="text-center py-5">
+            <i class="bi bi-stars text-warning" style="font-size: 2rem;"></i>
+            <p class="text-muted mt-2 mb-0">
+              Start a conversation — ask anything!
+            </p>
+            <p class="text-muted small">
+              Powered by Gemini 2.5 Flash
+            </p>
+          </div>
+        }
+
+        <!-- Message list -->
+        @for (msg of messages(); track $index) {
+
+          <!-- User message -->
+          @if (msg.role === 'user') {
+            <div class="message-row user-row mb-3">
+              <div class="d-flex justify-content-end">
+                <div class="message-bubble user-bubble">
+                  <p class="mb-0" style="white-space: pre-wrap;">
+                    {{ msg.content }}
+                  </p>
+                  <div class="message-time text-end mt-1">
+                    {{ formatTime(msg.createdAt) }}
+                  </div>
+                </div>
+                <div class="message-avatar ms-2">
+                  <i class="bi bi-person-fill"></i>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Assistant message -->
+          @if (msg.role === 'assistant') {
+            <div class="message-row assistant-row mb-3">
+              <div class="d-flex justify-content-start">
+                <div class="message-avatar me-2">
+                  <i class="bi bi-stars"></i>
+                </div>
+                <div class="flex-grow-1" style="max-width: 75%;">
+                  <div class="message-bubble assistant-bubble">
+                    <p class="mb-0" style="white-space: pre-wrap;">
+                      {{ msg.content }}
+                    </p>
+                  </div>
+
+                  <!-- AI metadata badge -->
+                  @if (msg.aiMeta) {
+                    <div class="d-flex align-items-center gap-2 mt-1 ms-1">
+                      <span class="text-muted" style="font-size: 0.7rem;">
+                        <i class="bi bi-clock me-1"></i>
+                        {{ msg.aiMeta.latencyMs }}ms
+                      </span>
+                      <span class="text-muted" style="font-size: 0.7rem;">
+                        <i class="bi bi-cpu me-1"></i>
+                        {{ msg.aiMeta.inputTokens + msg.aiMeta.outputTokens }} tokens
+                      </span>
+                      <span class="text-muted" style="font-size: 0.7rem;">
+                        {{ formatTime(msg.createdAt) }}
+                      </span>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        }
+
+        <!-- Streaming message — renders while AI is responding -->
+        @if (streaming().isStreaming || streaming().currentText) {
+          <div class="message-row assistant-row mb-3">
+            <div class="d-flex justify-content-start">
+              <div class="message-avatar me-2">
+                <i class="bi bi-stars text-warning"></i>
+              </div>
+              <div class="flex-grow-1" style="max-width: 75%;">
+                <div class="message-bubble assistant-bubble streaming-bubble">
+
+                  @if (!streaming().currentText) {
+                    <!-- Thinking indicator — shown before first chunk arrives -->
+                    <div class="typing-indicator">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  } @else {
+                    <!-- Streaming text — grows as chunks arrive -->
+                    <p class="mb-0" style="white-space: pre-wrap;">
+                      {{ streaming().currentText }}
+                      <!-- Blinking cursor at end while streaming -->
+                      @if (streaming().isStreaming) {
+                        <span class="streaming-cursor">|</span>
+                      }
+                    </p>
+                  }
+
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Error message -->
+        @if (streaming().error) {
+          <div class="alert alert-danger d-flex align-items-center
+                      gap-2 mx-0 py-2" role="alert">
+            <i class="bi bi-exclamation-circle-fill flex-shrink-0"></i>
+            <span class="small">{{ streaming().error }}</span>
+            <button
+              class="btn-close ms-auto"
+              style="font-size: 0.7rem;"
+              (click)="streaming.update(s => ({...s, error: ''}))"
+            ></button>
+          </div>
+        }
+
+      </div>
+      <!-- End messages container -->
+
+      <!-- Message input area -->
+      <div class="chat-input-area border-top bg-white px-4 py-3">
+
+        <div class="input-group">
+          <textarea
+            #messageInput
+            class="form-control chat-textarea"
+            placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
+            rows="1"
+            [value]="messageInput()"
+            (input)="messageInput.set($any($event.target).value)"
+            (keydown)="onKeyDown($event)"
+            [disabled]="streaming().isStreaming"
+          ></textarea>
+
+          <button
+            class="btn btn-primary send-btn"
+            (click)="sendMessage()"
+            [disabled]="!messageInput().trim() || streaming().isStreaming"
+            title="Send message (Enter)"
+          >
+            @if (streaming().isStreaming) {
+              <span class="spinner-border spinner-border-sm" role="status"></span>
+            } @else {
+              <i class="bi bi-send-fill"></i>
+            }
+          </button>
+        </div>
+
+        <!-- Input hints -->
+        <div class="d-flex justify-content-between align-items-center mt-1">
+          <small class="text-muted">
+            <kbd style="font-size: 0.65rem;">Enter</kbd> to send
+            &nbsp;·&nbsp;
+            <kbd style="font-size: 0.65rem;">Shift + Enter</kbd> for new line
+          </small>
+          <small class="text-muted">
+            {{ messageInput().length }} / 2000
+          </small>
+        </div>
+
+      </div>
+      <!-- End input area -->
+
+    }
+    <!-- End if activeConversation -->
+
+  </main>
+  <!-- End main chat area -->
+
+</div>
+<!-- End chat-layout -->

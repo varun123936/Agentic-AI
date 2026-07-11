@@ -1,0 +1,233 @@
+<div class="auth-wrapper">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12 col-sm-10 col-md-6 col-lg-5">
+
+        <!-- Logo / Header -->
+        <div class="text-center mb-4">
+          <div class="auth-logo">
+            <i class="bi bi-braces-asterisk me-2"></i>Knowledge Base AI
+          </div>
+          <p class="auth-subtitle mt-1">Create your free account</p>
+        </div>
+
+        <!-- Card -->
+        <div class="card auth-card">
+          <div class="card-body p-4 p-md-5">
+
+            <h4 class="card-title fw-bold mb-1">Get started</h4>
+            <p class="text-muted small mb-4">
+              Fill in the details below to create your account
+            </p>
+
+            <form
+              [formGroup]="registerForm"
+              (ngSubmit)="onSubmit()"
+              novalidate
+            >
+
+              <!-- Full Name -->
+              <div class="mb-3">
+                <label for="name" class="form-label fw-medium">
+                  Full Name
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-white">
+                    <i class="bi bi-person text-muted"></i>
+                  </span>
+                  <input
+                    id="name"
+                    type="text"
+                    formControlName="name"
+                    placeholder="Ravi Kumar"
+                    autocomplete="name"
+                    class="form-control"
+                    [class.is-invalid]="name?.invalid && name?.touched"
+                    [class.is-valid]="name?.valid && name?.touched"
+                  />
+                  @if (name?.invalid && name?.touched) {
+                    <div class="invalid-feedback">
+                      @if (name?.errors?.['required']) {
+                        Full name is required
+                      }
+                      @if (name?.errors?.['minlength']) {
+                        Name must be at least 2 characters
+                      }
+                      @if (name?.errors?.['maxlength']) {
+                        Name must not exceed 100 characters
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Email -->
+              <div class="mb-3">
+                <label for="email" class="form-label fw-medium">
+                  Work Email
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-white">
+                    <i class="bi bi-envelope text-muted"></i>
+                  </span>
+                  <input
+                    id="email"
+                    type="email"
+                    formControlName="email"
+                    placeholder="you@company.com"
+                    autocomplete="email"
+                    class="form-control"
+                    [class.is-invalid]="email?.invalid && email?.touched"
+                    [class.is-valid]="email?.valid && email?.touched"
+                  />
+                  @if (email?.invalid && email?.touched) {
+                    <div class="invalid-feedback">
+                      @if (email?.errors?.['required']) {
+                        Email address is required
+                      }
+                      @if (email?.errors?.['email']) {
+                        Please enter a valid email address
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Password -->
+              <div class="mb-2">
+                <label for="password" class="form-label fw-medium">
+                  Password
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-white">
+                    <i class="bi bi-lock text-muted"></i>
+                  </span>
+                  <input
+                    id="password"
+                    [type]="showPassword() ? 'text' : 'password'"
+                    formControlName="password"
+                    placeholder="Min 8 chars with a number"
+                    autocomplete="new-password"
+                    class="form-control border-end-0"
+                    [class.is-invalid]="password?.invalid && password?.touched"
+                    [class.is-valid]="password?.valid && password?.touched"
+                  />
+                  <!-- Show / Hide toggle -->
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary border-start-0"
+                    (click)="togglePassword()"
+                    tabindex="-1"
+                    [attr.aria-label]="showPassword()
+                      ? 'Hide password' : 'Show password'"
+                  >
+                    <i class="bi"
+                       [class.bi-eye]="!showPassword()"
+                       [class.bi-eye-slash]="showPassword()">
+                    </i>
+                  </button>
+
+                  @if (password?.invalid && password?.touched) {
+                    <div class="invalid-feedback">
+                      @if (password?.errors?.['required']) {
+                        Password is required
+                      }
+                      @if (password?.errors?.['minlength']) {
+                        Must be at least 8 characters
+                      }
+                      @if (password?.errors?.['hasNumber']) {
+                        Must contain at least one number
+                      }
+                      @if (password?.errors?.['hasLetter']) {
+                        Must contain at least one letter
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Password strength bar -->
+              @if (passwordStrength()) {
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between
+                              align-items-center mb-1">
+                    <small class="text-muted">Password strength</small>
+                    <small class="fw-medium text-{{ passwordStrength()!.color }}">
+                      {{ passwordStrength()!.label }}
+                    </small>
+                  </div>
+                  <div class="bg-light rounded" style="height: 4px;">
+                    <div
+                      class="password-strength-bar bg-{{ passwordStrength()!.color }}"
+                      [style.width]="passwordStrength()!.width"
+                    ></div>
+                  </div>
+                </div>
+              }
+
+              <!-- Password rules hint -->
+              @if (!password?.touched || password?.valid) {
+                <div class="mb-3">
+                  <small class="text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    At least 8 characters with one letter and one number
+                  </small>
+                </div>
+              }
+
+              <!-- Error alert -->
+              @if (errorMessage()) {
+                <div class="alert alert-danger d-flex align-items-center
+                            gap-2 py-2 mb-3" role="alert">
+                  <i class="bi bi-x-circle-fill flex-shrink-0"></i>
+                  <span class="small">{{ errorMessage() }}</span>
+                </div>
+              }
+
+              <!-- Submit button -->
+              <div class="d-grid mb-3">
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  [disabled]="isSubmitting()"
+                >
+                  @if (isSubmitting()) {
+                    <span
+                      class="spinner-border spinner-border-sm me-2"
+                      role="status"
+                      aria-hidden="true">
+                    </span>
+                    Creating account...
+                  } @else {
+                    <i class="bi bi-person-plus me-2"></i>
+                    Create Account
+                  }
+                </button>
+              </div>
+
+              <!-- Divider -->
+              <hr class="text-muted my-3" />
+
+              <!-- Login link -->
+              <p class="text-center text-muted small mb-0">
+                Already have an account?
+                <a routerLink="/login"
+                   class="text-primary fw-medium text-decoration-none">
+                  Sign in here
+                </a>
+              </p>
+
+            </form>
+          </div>
+        </div>
+
+        <!-- Footer note -->
+        <p class="text-center text-muted mt-3" style="font-size: 0.78rem;">
+          Your data is private and secure
+          <i class="bi bi-shield-lock text-success ms-1"></i>
+        </p>
+
+      </div>
+    </div>
+  </div>
+</div>

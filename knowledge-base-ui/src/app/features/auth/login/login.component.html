@@ -1,0 +1,169 @@
+<div class="auth-wrapper">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12 col-sm-10 col-md-6 col-lg-5">
+
+        <!-- Logo / Header -->
+        <div class="text-center mb-4">
+          <div class="auth-logo">
+            <i class="bi bi-braces-asterisk me-2"></i>Knowledge Base AI
+          </div>
+          <p class="auth-subtitle mt-1">Sign in to your account</p>
+        </div>
+
+        <!-- Session expired alert -->
+        @if (sessionExpiredMessage()) {
+          <div class="alert alert-warning d-flex align-items-center
+                      gap-2 py-2 mb-3" role="alert">
+            <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+            <span class="small">{{ sessionExpiredMessage() }}</span>
+          </div>
+        }
+
+        <!-- Card -->
+        <div class="card auth-card">
+          <div class="card-body p-4 p-md-5">
+
+            <h4 class="card-title fw-bold mb-1">Welcome back</h4>
+            <p class="text-muted small mb-4">
+              Enter your credentials to continue
+            </p>
+
+            <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" novalidate>
+
+              <!-- Email field -->
+              <div class="mb-3">
+                <label for="email" class="form-label fw-medium">
+                  Email address
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-white">
+                    <i class="bi bi-envelope text-muted"></i>
+                  </span>
+                  <input
+                    id="email"
+                    type="email"
+                    formControlName="email"
+                    placeholder="you@company.com"
+                    autocomplete="email"
+                    class="form-control"
+                    [class.is-invalid]="email?.invalid && email?.touched"
+                    [class.is-valid]="email?.valid && email?.touched"
+                  />
+                  @if (email?.invalid && email?.touched) {
+                    <div class="invalid-feedback">
+                      @if (email?.errors?.['required']) {
+                        Email address is required
+                      }
+                      @if (email?.errors?.['email']) {
+                        Please enter a valid email address
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Password field -->
+              <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label for="password" class="form-label fw-medium mb-0">
+                    Password
+                  </label>
+                </div>
+                <div class="input-group">
+                  <span class="input-group-text bg-white">
+                    <i class="bi bi-lock text-muted"></i>
+                  </span>
+                  <input
+                    id="password"
+                    [type]="showPassword() ? 'text' : 'password'"
+                    formControlName="password"
+                    placeholder="Enter your password"
+                    autocomplete="current-password"
+                    class="form-control border-end-0"
+                    [class.is-invalid]="password?.invalid && password?.touched"
+                    [class.is-valid]="password?.valid && password?.touched"
+                  />
+                  <!-- Show / Hide password toggle -->
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary border-start-0"
+                    (click)="togglePassword()"
+                    tabindex="-1"
+                    [attr.aria-label]="showPassword()
+                      ? 'Hide password' : 'Show password'"
+                  >
+                    <i class="bi"
+                       [class.bi-eye]="!showPassword()"
+                       [class.bi-eye-slash]="showPassword()">
+                    </i>
+                  </button>
+                  @if (password?.invalid && password?.touched) {
+                    <div class="invalid-feedback">
+                      @if (password?.errors?.['required']) {
+                        Password is required
+                      }
+                      @if (password?.errors?.['minlength']) {
+                        Password must be at least 8 characters
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Error alert -->
+              @if (errorMessage()) {
+                <div class="alert alert-danger d-flex align-items-center
+                            gap-2 py-2 mb-3" role="alert">
+                  <i class="bi bi-x-circle-fill flex-shrink-0"></i>
+                  <span class="small">{{ errorMessage() }}</span>
+                </div>
+              }
+
+              <!-- Submit button -->
+              <div class="d-grid mb-3">
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  [disabled]="isSubmitting()"
+                >
+                  @if (isSubmitting()) {
+                    <span
+                      class="spinner-border spinner-border-sm me-2"
+                      role="status"
+                      aria-hidden="true">
+                    </span>
+                    Signing in...
+                  } @else {
+                    <i class="bi bi-box-arrow-in-right me-2"></i>
+                    Sign In
+                  }
+                </button>
+              </div>
+
+              <!-- Divider -->
+              <hr class="text-muted my-3" />
+
+              <!-- Register link -->
+              <p class="text-center text-muted small mb-0">
+                Don't have an account?
+                <a routerLink="/register"
+                   class="text-primary fw-medium text-decoration-none">
+                  Create one free
+                </a>
+              </p>
+
+            </form>
+          </div>
+        </div>
+
+        <!-- Footer note -->
+        <p class="text-center text-muted mt-3" style="font-size: 0.78rem;">
+          Protected by JWT authentication
+          <i class="bi bi-shield-check text-success ms-1"></i>
+        </p>
+
+      </div>
+    </div>
+  </div>
+</div>
