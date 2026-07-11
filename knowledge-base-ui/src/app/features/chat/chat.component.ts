@@ -31,7 +31,7 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
 
   // ── Template refs ────────────────────────────────────────────
   @ViewChild('messageContainer') messageContainer!: ElementRef;
-  @ViewChild('messageInput') messageInputRef!: ElementRef;
+  @ViewChild('messageInputRef') messageInputRef!: ElementRef;
 
   // ── State signals ────────────────────────────────────────────
   conversations = signal<Conversation[]>([]);
@@ -290,4 +290,11 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   isLastMessage(index: number): boolean {
     return index === this.messages().length - 1;
   }
+
+  clearError(): void {
+  this.streaming.update(s => ({
+    ...s,
+    error: ''
+  }));
+}
 }

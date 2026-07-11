@@ -249,7 +249,7 @@
             <button
               class="btn-close ms-auto"
               style="font-size: 0.7rem;"
-              (click)="streaming.update(s => ({...s, error: ''}))"
+              (click)="clearError()"
             ></button>
           </div>
         }
@@ -262,7 +262,7 @@
 
         <div class="input-group">
           <textarea
-            #messageInput
+            #messageInputRef
             class="form-control chat-textarea"
             placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
             rows="1"
