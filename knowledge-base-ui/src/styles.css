@@ -1,59 +1,49 @@
-/* Global styles — Bootstrap handles most of it */
+/* PrimeNG theme */
+/* @import "primeng/resources/themes/lara-light-blue/theme.css";
+@import "primeng/resources/primeng.css"; */
+@import "primeicons/primeicons.css";
+/* @import "primeflex/primeflex.css"; */
+
+/* Angular Material */
+@import "@angular/material/prebuilt-themes/indigo-pink.css";
+
+/* Global */
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background-color: #f8f9fa;
-  font-family: -apple-system, BlinkMacSystemFont,
-               'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+  background: #f4f6f9;
+  color: #1e2a3a;
 }
 
-/* AI app specific styles */
-.auth-wrapper {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #e8f4f8 0%, #f0f4ff 100%);
+/* Enterprise color tokens */
+:root {
+  --brand-primary:   #1a56db;
+  --brand-secondary: #0ea5e9;
+  --brand-success:   #16a34a;
+  --brand-warning:   #d97706;
+  --brand-danger:    #dc2626;
+  --surface-ground:  #f4f6f9;
+  --surface-card:    #ffffff;
+  --border-subtle:   #e5e7eb;
+  --text-primary:    #111827;
+  --text-muted:      #6b7280;
 }
 
-.auth-card {
-  width: 100%;
-  max-width: 420px;
-  border: none;
-  border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
 
-.auth-logo {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #0d6efd;
-  letter-spacing: -0.5px;
+/* Streaming cursor */
+.streaming-cursor {
+  display: inline-block;
+  color: var(--brand-primary);
+  animation: blink 0.8s step-end infinite;
 }
-
-.auth-subtitle {
-  color: #6c757d;
-  font-size: 0.95rem;
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
-
-.form-control:focus {
-  border-color: #0d6efd;
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
-}
-
-.btn-primary {
-  padding: 0.6rem 1rem;
-  font-weight: 500;
-  border-radius: 8px;
-}
-
-.field-error {
-  font-size: 0.78rem;
-  color: #dc3545;
-  margin-top: 4px;
-}
-
-.password-strength-bar {
-  height: 4px;
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }

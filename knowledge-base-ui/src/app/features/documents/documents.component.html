@@ -1,0 +1,548 @@
+<!-- PrimeNG Toast -->
+<p-toast position="top-right" />
+
+<div class="doc-page">
+
+  <!-- ── Page Header ────────────────────────────────────────── -->
+  <mat-toolbar class="page-toolbar">
+    <div class="toolbar-left">
+      <mat-icon class="toolbar-icon">folder_open</mat-icon>
+      <div>
+        <h1 class="toolbar-title">Documents</h1>
+        <p class="toolbar-subtitle">
+          Upload and manage your knowledge base documents
+        </p>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <span class="doc-count-badge">
+        <mat-icon style="font-size:14px;height:14px;width:14px;">
+          description
+        </mat-icon>
+        {{ documents().length }}
+        {{ documents().length === 1 ? 'document' : 'documents' }}
+      </span>
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="loadDocuments()"
+        [disabled]="isLoading()"
+        class="refresh-btn"
+      >
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+    </div>
+  </mat-toolbar>
+
+  <div class="page-content">
+    <div class="content-grid">
+
+      <!-- ── Left Panel: Upload ──────────────────────────────── -->
+      <div class="left-panel">
+
+        <!-- Upload Drop Zone -->
+        <mat-card class="upload-card">
+          <mat-card-content>
+            <div
+              class="drop-zone"
+              [class.drag-active]="isDragOver()"
+              (dragover)="onDragOver($event)"
+              (dragleave)="onDragLeave($event)"
+              (drop)="onDrop($event)"
+              (click)="openFilePicker()"
+            >
+              <div class="drop-zone-inner">
+                <div class="upload-icon-wrap" [class.active]="isDragOver()">
+                  <mat-icon class="upload-icon">cloud_upload</mat-icon>
+                </div>
+
+                <h3 class="drop-title">
+                  {{ isDragOver() ? 'Release to upload' : 'Drop files here' }}
+                </h3>
+                <p class="drop-subtitle">or click to browse your computer</p>
+
+                <button
+                  mat-stroked-button
+                  color="primary"
+                  class="browse-btn"
+                  (click)="$event.stopPropagation(); openFilePicker()"
+                >
+                  <mat-icon>folder_open</mat-icon>
+                  Browse Files
+                </button>
+
+                <mat-divider class="my-3" />
+
+                <div class="format-chips">
+                  <mat-chip color="warn" highlighted>
+                    <mat-icon matChipAvatar>picture_as_pdf</mat-icon>
+                    PDF
+                  </mat-chip>
+                  <mat-chip>
+                    <mat-icon matChipAvatar>text_snippet</mat-icon>
+                    TXT
+                  </mat-chip>
+                  <mat-chip color="accent" highlighted>
+                    <mat-icon matChipAvatar>code</mat-icon>
+                    Markdown
+                  </mat-chip>
+                </div>
+
+                <p class="size-limit">Max 10 MB per file</p>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+
+        <!-- Hidden file input -->
+        <input
+          #fileInput
+          type="file"
+          accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
+          multiple
+          class="d-none"
+          (change)="onFileInputChange($event)"
+        />
+
+        <!-- Upload Queue -->
+        @if (uploadItems().length > 0) {
+          <mat-card class="queue-card">
+            <mat-card-header>
+              <mat-card-title>
+                <div class="queue-header">
+                  <div class="d-flex align-items-center gap-2">
+                    <mat-icon color="primary">upload</mat-icon>
+                    <span>Upload Queue</span>
+                    <span class="queue-badge">{{ uploadItems().length }}</span>
+                  </div>
+                  <button
+                    mat-button
+                    color="warn"
+                    (click)="clearQueue()"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </mat-card-title>
+            </mat-card-header>
+            <mat-card-content class="p-0">
+              @for (item of uploadItems(); track item.uid) {
+                <div class="queue-item">
+                  <div class="queue-item-top">
+                    <mat-icon
+                      [class]="item.file.type === 'application/pdf'
+                        ? 'text-danger' : 'text-muted'"
+                    >
+                      {{ getFileIcon(item.file.type) === 'pi pi-file-pdf'
+                         ? 'picture_as_pdf' : 'description' }}
+                    </mat-icon>
+
+                    <div class="queue-item-info">
+                      <p class="queue-filename">{{ item.file.name }}</p>
+                      <p class="queue-filesize">
+                        {{ formatFileSize(item.file.size) }}
+                      </p>
+                    </div>
+
+                    <!-- Status icon -->
+                    @if (item.status === 'uploading') {
+                      <mat-icon
+                        class="status-icon uploading"
+                        matTooltip="Uploading..."
+                      >
+                        sync
+                      </mat-icon>
+                    }
+                    @if (item.status === 'success') {
+                      <mat-icon
+                        class="status-icon success"
+                        matTooltip="Upload complete"
+                      >
+                        check_circle
+                      </mat-icon>
+                    }
+                    @if (item.status === 'error') {
+                      <mat-icon
+                        class="status-icon error"
+                        matTooltip="Remove"
+                        style="cursor:pointer"
+                        (click)="removeUploadItem(item.uid)"
+                      >
+                        cancel
+                      </mat-icon>
+                    }
+                  </div>
+
+                  @if (item.status === 'uploading') {
+                    <mat-progress-bar
+                      mode="determinate"
+                      [value]="item.progress"
+                      class="mt-1"
+                    />
+                  }
+
+                  @if (item.status === 'error') {
+                    <p class="queue-error">
+                      <mat-icon style="font-size:12px;height:12px;width:12px;">
+                        error
+                      </mat-icon>
+                      {{ item.errorMessage }}
+                    </p>
+                  }
+                  @if (item.status === 'success') {
+                    <p class="queue-success">Uploaded successfully</p>
+                  }
+
+                  <mat-divider />
+                </div>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+      </div>
+
+      <!-- ── Right Panel: Documents Table ───────────────────── -->
+      <div class="right-panel">
+
+        <!-- Skeleton loading -->
+        @if (isLoading()) {
+          <mat-card class="table-card">
+            <mat-card-content>
+              @for (i of [1,2,3]; track i) {
+                <div class="skeleton-row">
+                  <p-skeleton width="40px" height="40px"
+                              borderRadius="8px" />
+                  <div class="skeleton-lines">
+                    <p-skeleton width="60%" height="14px" />
+                    <p-skeleton width="40%" height="11px" class="mt-1" />
+                  </div>
+                  <p-skeleton width="80px" height="28px"
+                              borderRadius="20px" />
+                  <p-skeleton width="100px" height="32px"
+                              borderRadius="6px" />
+                </div>
+                <mat-divider />
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+        <!-- Empty state -->
+        @if (!isLoading() && documents().length === 0) {
+          <mat-card class="empty-card">
+            <mat-card-content>
+              <div class="empty-state">
+                <div class="empty-icon-wrap">
+                  <mat-icon class="empty-icon">folder_open</mat-icon>
+                </div>
+                <h3>No documents yet</h3>
+                <p>Upload your first document to get started with AI-powered search</p>
+                <button
+                  mat-raised-button
+                  color="primary"
+                  (click)="openFilePicker()"
+                >
+                  <mat-icon>upload</mat-icon>
+                  Upload Document
+                </button>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        }
+
+        <!-- Documents PrimeNG Table -->
+        @if (!isLoading() && documents().length > 0) {
+          <mat-card class="table-card">
+            <mat-card-content class="p-0">
+              <p-table
+                [value]="documents()"
+                [paginator]="documents().length > 10"
+                [rows]="10"
+                [rowsPerPageOptions]="[5, 10, 25]"
+                styleClass="p-datatable-sm p-datatable-striped"
+                [tableStyle]="{'min-width': '100%'}"
+                responsiveLayout="scroll"
+              >
+                <ng-template pTemplate="header">
+                  <tr>
+                    <th style="width: 40%">Document</th>
+                    <th style="width: 12%" class="text-center">Type</th>
+                    <th style="width: 12%" class="text-center">Size</th>
+                    <th style="width: 10%" class="text-center">Pages</th>
+                    <th style="width: 10%" class="text-center">Words</th>
+                    <th style="width: 16%" class="text-center">Actions</th>
+                  </tr>
+                </ng-template>
+
+                <ng-template pTemplate="body" let-doc>
+                  <tr class="doc-row">
+
+                    <!-- Document name + meta -->
+                    <td>
+                      <div class="doc-name-cell">
+                        <div class="doc-icon-box"
+                             [class.pdf]="doc.mimeType === 'application/pdf'"
+                             [class.txt]="doc.mimeType === 'text/plain'"
+                             [class.md]="doc.mimeType === 'text/markdown'">
+                          <mat-icon>
+                            {{ doc.mimeType === 'application/pdf'
+                               ? 'picture_as_pdf'
+                               : doc.mimeType === 'text/plain'
+                               ? 'description'
+                               : 'code' }}
+                          </mat-icon>
+                        </div>
+                        <div class="doc-info">
+                          <p class="doc-filename"
+                             [pTooltip]="doc.originalName"
+                             tooltipPosition="top">
+                            {{ doc.originalName }}
+                          </p>
+                          <div class="doc-meta-row">
+                            <small class="text-muted">
+                              {{ formatDate(doc.createdAt) }}
+                            </small>
+                            @if (doc.isIndexed) {
+                              <span class="indexed-pill">
+                                <mat-icon style="font-size:10px;
+                                          height:10px;width:10px;">
+                                  done_all
+                                </mat-icon>
+                                Indexed
+                              </span>
+                            }
+                            <span class="queries-pill">
+                              {{ doc.queryCount }} queries
+                            </span>
+                          </div>
+
+                          <!-- Token bar -->
+                          @if (doc.estimatedTokenCount) {
+                            <div class="token-bar-wrap">
+                              <mat-progress-bar
+                                mode="determinate"
+                                [value]="getTokenPercent(doc.estimatedTokenCount)"
+                                [color]="getTokenSeverity(doc.estimatedTokenCount) === 'danger'
+                                  ? 'warn' : 'primary'"
+                                class="token-bar"
+                              />
+                              <small class="token-label">
+                                ~{{ formatNumber(doc.estimatedTokenCount) }} tokens
+                              </small>
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    </td>
+
+                    <!-- File type chip -->
+                    <td class="text-center">
+                      <p-tag
+                        [value]="getTypeLabel(doc.mimeType)"
+                        [severity]="getFileSeverity(doc.mimeType)"
+                        [rounded]="true"
+                      />
+                    </td>
+
+                    <!-- Size -->
+                    <td class="text-center">
+                      <span class="stat-text">
+                        {{ formatFileSize(doc.fileSizeBytes) }}
+                      </span>
+                    </td>
+
+                    <!-- Pages -->
+                    <td class="text-center">
+                      <span class="stat-text">
+                        {{ doc.pageCount ?? '—' }}
+                      </span>
+                    </td>
+
+                    <!-- Words -->
+                    <td class="text-center">
+                      <span class="stat-text">
+                        {{ formatNumber(doc.wordCount) }}
+                      </span>
+                    </td>
+
+                    <!-- Actions -->
+                    <td>
+                      <div class="action-buttons">
+
+                        <!-- Index -->
+                        @if (!doc.isIndexed) {
+                          <button
+                            pButton
+                            icon="pi pi-search"
+                            label="Index"
+                            severity="info"
+                            size="small"
+                            [loading]="isIndexing(doc._id)"
+                            (click)="indexDocument(doc)"
+                            pTooltip="Index for AI search"
+                            tooltipPosition="top"
+                          ></button>
+                        } @else {
+                          <button
+                            pButton
+                            icon="pi pi-check-circle"
+                            label="Indexed"
+                            severity="success"
+                            size="small"
+                            [disabled]="true"
+                          ></button>
+                        }
+
+                        <!-- Summary -->
+                        <button
+                          pButton
+                          icon="pi pi-file-edit"
+                          severity="secondary"
+                          size="small"
+                          (click)="openSummary(doc)"
+                          pTooltip="AI Summary"
+                          tooltipPosition="top"
+                        ></button>
+
+                        <!-- Delete -->
+                        <button
+                          pButton
+                          icon="pi pi-trash"
+                          severity="danger"
+                          size="small"
+                          (click)="confirmDelete(doc)"
+                          pTooltip="Delete document"
+                          tooltipPosition="top"
+                        ></button>
+
+                      </div>
+                    </td>
+
+                  </tr>
+                </ng-template>
+
+                <ng-template pTemplate="emptymessage">
+                  <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">
+                      No documents found
+                    </td>
+                  </tr>
+                </ng-template>
+
+              </p-table>
+            </mat-card-content>
+          </mat-card>
+        }
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Delete Confirm Dialog (PrimeNG) ══════════════════════════ -->
+<p-dialog
+  header="Delete Document"
+  [(visible)]="showDeleteDialog"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  [style]="{ width: '480px' }"
+  [closable]="!isDeleting()"
+  (onHide)="cancelDelete()"
+>
+  <ng-template pTemplate="header">
+    <div class="delete-dialog-header">
+      <mat-icon class="delete-header-icon">delete_forever</mat-icon>
+      <span>Delete Document</span>
+    </div>
+  </ng-template>
+
+  <div class="delete-dialog-body">
+    <p class="text-muted mb-2">
+      You are about to permanently delete:
+    </p>
+    <p class="doc-delete-name">
+      "{{ documentToDelete()?.originalName }}"
+    </p>
+
+    <div class="warning-box">
+      <mat-icon class="warning-icon">warning_amber</mat-icon>
+      <div>
+        <p class="warning-title">This action cannot be undone</p>
+        <p class="warning-body">
+          The document and all its indexed search chunks will be
+          permanently removed from the system.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <button
+      pButton
+      label="Cancel"
+      severity="secondary"
+      [disabled]="isDeleting()"
+      (click)="cancelDelete()"
+    ></button>
+    <button
+      pButton
+      label="Delete Document"
+      severity="danger"
+      icon="pi pi-trash"
+      [loading]="isDeleting()"
+      (click)="executeDelete()"
+    ></button>
+  </ng-template>
+</p-dialog>
+
+<!-- ══ Summary Dialog (PrimeNG) ═════════════════════════════════ -->
+<p-dialog
+  [header]="'Summary — ' + summaryDocumentName()"
+  [(visible)]="showSummaryDialog"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  [style]="{ width: '760px', maxHeight: '80vh' }"
+  (onHide)="closeSummary()"
+>
+  <div class="summary-body">
+    @if (isSummarizing() && !summaryText()) {
+      <div class="text-center py-4">
+        <app-loading-spinner
+          type="grow"
+          message="AI is reading your document..."
+        />
+      </div>
+    }
+
+    @if (summaryText()) {
+      <div class="summary-content">
+        <pre class="summary-pre">{{ summaryText() }}<span
+          class="streaming-cursor"
+          *ngIf="isSummarizing()">|</span></pre>
+      </div>
+    }
+  </div>
+
+  <ng-template pTemplate="footer">
+    <div class="summary-footer">
+      <small class="text-muted">
+        <mat-icon style="font-size:14px;height:14px;width:14px;
+                         vertical-align:middle;">
+          auto_awesome
+        </mat-icon>
+        Generated by Gemini 2.5 Flash
+      </small>
+      <button
+        pButton
+        label="Close"
+        severity="secondary"
+        size="small"
+        (click)="closeSummary()"
+      ></button>
+    </div>
+  </ng-template>
+</p-dialog>

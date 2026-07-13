@@ -1,9 +1,9 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
-import { DashboardComponent } from './features/dashboard/dashboard/dashboard.component';
-import { NotFoundComponent } from './features/not-found/not-found/not-found.component';
-import { ChatComponent } from './features/chat/chat.component';
+// import { DashboardComponent } from './features/dashboard/dashboard/dashboard.component';
+// import { NotFoundComponent } from './features/not-found/not-found/not-found.component';
+// import { ChatComponent } from './features/chat/chat.component';
 
 
 export const routes: Routes = [
@@ -43,13 +43,13 @@ export const routes: Routes = [
       import('./features/chat/chat.component')
         .then(m => m.ChatComponent)
   },
-//   {
-//     path: 'documents',
-//     canActivate: [authGuard],
-//     loadComponent: () =>
-//       import('./features/documents/documents.component')
-//         .then(m => m.DocumentsComponent)
-//   },
+  {
+    path: 'documents',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/documents/documents.component')
+        .then(m => m.DocumentsComponent)
+  },
 //   {
 //     path: 'rag',
 //     canActivate: [authGuard],
