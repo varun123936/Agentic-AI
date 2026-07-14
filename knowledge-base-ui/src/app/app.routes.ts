@@ -50,13 +50,13 @@ export const routes: Routes = [
       import('./features/documents/documents.component')
         .then(m => m.DocumentsComponent)
   },
-//   {
-//     path: 'rag',
-//     canActivate: [authGuard],
-//     loadComponent: () =>
-//       import('./features/rag/rag.component')
-//         .then(m => m.RagComponent)
-//   },
+  {
+    path: 'rag',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/rag/rag.component')
+        .then(m => m.RagComponent)
+  },
 
   // Admin only routes — both guards required
 //   {

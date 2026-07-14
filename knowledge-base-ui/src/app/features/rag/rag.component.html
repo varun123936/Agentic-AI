@@ -1,0 +1,469 @@
+<p-toast position="top-right"></p-toast>
+
+<div class="rag-page">
+
+  <!-- ── Page Toolbar ─────────────────────────────────────────── -->
+  <mat-toolbar class="page-toolbar">
+    <div class="toolbar-left">
+      <mat-icon class="toolbar-icon">manage_search</mat-icon>
+      <div>
+        <h1 class="toolbar-title">Knowledge Search</h1>
+        <p class="toolbar-subtitle">
+          Semantic AI-powered search across your documents
+        </p>
+      </div>
+    </div>
+
+    <!-- Stats chips -->
+    @if (ragStats()) {
+      <div class="stats-row">
+        <span class="stat-chip">
+          <mat-icon>storage</mat-icon>
+          {{ formatNumber(ragStats()!.yourChunks) }} chunks indexed
+        </span>
+        <span class="stat-chip">
+          <mat-icon>memory</mat-icon>
+          {{ ragStats()!.embeddingProvider }}
+        </span>
+      </div>
+    }
+  </mat-toolbar>
+
+  <!-- ── Search Bar ────────────────────────────────────────────── -->
+  <div class="search-bar-wrapper">
+    <mat-card class="search-card">
+      <mat-card-content>
+
+        <div class="search-row">
+
+          <!-- Document filter dropdown -->
+          <p-dropdown
+            [options]="documentOptions()"
+            [(ngModel)]="selectedDocId"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="All Documents"
+            styleClass="doc-filter-dropdown"
+            [showClear]="selectedDocId() !== null"
+          ></p-dropdown>
+
+          <!-- Search input -->
+          <mat-form-field
+            appearance="outline"
+            class="search-field"
+            subscriptSizing="dynamic"
+          >
+            <mat-icon matPrefix>search</mat-icon>
+            <input
+              matInput
+              placeholder="Ask anything about your documents..."
+              [ngModel]="searchQuery()"
+              (ngModelChange)="searchQuery.set($event)"
+              (keydown)="onSearchKeydown($event)"
+              [disabled]="isStreaming()"
+            />
+            @if (searchQuery()) {
+              <button
+                matSuffix
+                mat-icon-button
+                (click)="clearSearch()"
+                [disabled]="isStreaming()"
+                matTooltip="Clear search"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </mat-form-field>
+
+          <!-- Search button -->
+          <button
+            pButton
+            label="Search"
+            icon="pi pi-search"
+            [disabled]="!canSearch()"
+            [loading]="isStreaming()"
+            (click)="runSearch()"
+            class="search-btn"
+          ></button>
+
+        </div>
+
+        <!-- Suggested queries — shown before first search -->
+        @if (!hasSearched()) {
+          <div class="suggestions-row">
+            <span class="suggestions-label">
+              <mat-icon>lightbulb</mat-icon>
+              Try asking:
+            </span>
+            @for (q of getSuggestedQueries(); track q) {
+              <button
+                mat-stroked-button
+                class="suggestion-chip"
+                (click)="useSuggestedQuery(q)"
+              >
+                {{ q }}
+              </button>
+            }
+          </div>
+        }
+
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- ── Results Layout ────────────────────────────────────────── -->
+  @if (hasSearched()) {
+    <div class="results-layout">
+
+      <!-- ── Left: Context Chunks ─────────────────────────────── -->
+      <div class="chunks-panel">
+        <mat-card class="panel-card">
+          <mat-card-header class="panel-header">
+            <mat-card-title>
+              <div class="panel-title-row">
+                <div class="panel-title-left">
+                  <mat-icon color="primary">layers</mat-icon>
+                  <span>Retrieved Chunks</span>
+                  @if (searchChunks().length > 0) {
+                    <span class="count-badge">{{ searchChunks().length }}</span>
+                  }
+                </div>
+                <small class="text-muted">
+                  Ordered by relevance
+                </small>
+              </div>
+            </mat-card-title>
+          </mat-card-header>
+
+          <mat-divider></mat-divider>
+
+          <mat-card-content class="chunks-body">
+
+            <!-- Skeleton while loading chunks -->
+            @if (isSearching()) {
+              @for (i of [1, 2, 3]; track i) {
+                <div class="chunk-skeleton">
+                  <p-skeleton
+                    width="60%"
+                    height="12px"
+                    class="mb-2"
+                  ></p-skeleton>
+                  <p-skeleton
+                    width="100%"
+                    height="10px"
+                    class="mb-1"
+                  ></p-skeleton>
+                  <p-skeleton
+                    width="90%"
+                    height="10px"
+                    class="mb-1"
+                  ></p-skeleton>
+                  <p-skeleton
+                    width="80%"
+                    height="10px"
+                  ></p-skeleton>
+                </div>
+              }
+            }
+
+            <!-- No results -->
+            @if (!isSearching() && hasSearched() && searchChunks().length === 0) {
+              <div class="no-chunks">
+                <mat-icon>search_off</mat-icon>
+                <p>No relevant chunks found</p>
+                <small>
+                  Try rephrasing your question or
+                  make sure your documents are indexed
+                </small>
+              </div>
+            }
+
+            <!-- Chunk cards -->
+            @for (chunk of searchChunks(); track chunk.id; let i = $index) {
+              <div class="chunk-card" [class.top-chunk]="i === 0">
+
+                <!-- Chunk header -->
+                <div class="chunk-header">
+                  <div class="chunk-rank">
+                    <span class="rank-number">{{ i + 1 }}</span>
+                  </div>
+
+                  <div class="chunk-meta">
+                    <p class="chunk-doc-name">
+                      <mat-icon style="font-size:13px;
+                                height:13px;width:13px;
+                                vertical-align:middle;">
+                        description
+                      </mat-icon>
+                      {{ chunk.metadata.documentName }}
+                    </p>
+                    <p class="chunk-words">
+                      {{ chunk.metadata.wordCount }} words
+                    </p>
+                  </div>
+
+                  <p-tag
+                    [value]="getScoreLabel(chunk.similarityScore)"
+                    [severity]="getScoreColor(chunk.similarityScore)"
+                    [rounded]="true"
+                  ></p-tag>
+                </div>
+
+                <!-- Score bar -->
+                <div class="score-bar-row">
+                  <mat-progress-bar
+                    mode="determinate"
+                    [value]="getScorePercent(chunk.similarityScore)"
+                    [color]="chunk.similarityScore >= 0.6 ? 'primary' : 'accent'"
+                    class="score-bar"
+                  ></mat-progress-bar>
+                  <span class="score-label">
+                    {{ getScorePercent(chunk.similarityScore) }}%
+                  </span>
+                </div>
+
+                <!-- Chunk text preview -->
+                <div class="chunk-text">
+                  {{ chunk.text.length > 300
+                     ? (chunk.text | slice:0:300) + '...'
+                     : chunk.text }}
+                </div>
+
+              </div>
+
+              @if (i < searchChunks().length - 1) {
+                <mat-divider></mat-divider>
+              }
+            }
+
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <!-- ── Right: AI Answer ──────────────────────────────────── -->
+      <div class="answer-panel">
+        <mat-card class="panel-card">
+          <mat-card-header class="panel-header">
+            <mat-card-title>
+              <div class="panel-title-row">
+                <div class="panel-title-left">
+                  <mat-icon class="ai-icon">auto_awesome</mat-icon>
+                  <span>AI Answer</span>
+                  @if (isStreaming()) {
+                    <span class="streaming-indicator">
+                      <span class="dot"></span>
+                      <span class="dot"></span>
+                      <span class="dot"></span>
+                    </span>
+                  }
+                </div>
+                @if (lastLatencyMs()) {
+                  <small class="text-muted">
+                    {{ lastLatencyMs() }}ms &nbsp;·&nbsp;
+                    {{ formatNumber(lastInputTokens() + lastOutputTokens()) }} tokens
+                  </small>
+                }
+              </div>
+            </mat-card-title>
+          </mat-card-header>
+
+          <mat-divider></mat-divider>
+
+          <mat-card-content class="answer-body">
+
+            <!-- Status message while searching -->
+            @if (streamStatus() && !aiAnswer()) {
+              <div class="status-row">
+                <mat-progress-bar
+                  mode="indeterminate"
+                  class="mb-3"
+                ></mat-progress-bar>
+                <div class="status-message">
+                  <mat-icon class="status-icon">{{ isStreaming()
+                    ? 'hourglass_top' : 'check_circle' }}</mat-icon>
+                  <span>{{ streamStatus() }}</span>
+                </div>
+              </div>
+            }
+
+            <!-- Error state -->
+            @if (streamError()) {
+              <div class="error-box">
+                <mat-icon class="error-icon">error_outline</mat-icon>
+                <div class="error-content">
+                  <p class="error-title">Something went wrong</p>
+                  <p class="error-body">{{ streamError() }}</p>
+                </div>
+                <button
+                  mat-icon-button
+                  (click)="clearError()"
+                  class="error-close"
+                >
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+            }
+
+            <!-- AI Answer text -->
+            @if (aiAnswer()) {
+              <div class="answer-content">
+                <pre class="answer-pre">{{ aiAnswer() }}<span
+                  class="streaming-cursor"
+                  [style.display]="isStreaming() ? 'inline' : 'none'"
+                >|</span></pre>
+              </div>
+            }
+
+            <!-- Sources section -->
+            @if (streamSources().length > 0 && !isStreaming()) {
+              <div class="sources-section">
+                <mat-divider class="mb-3"></mat-divider>
+                <p class="sources-title">
+                  <mat-icon style="font-size:16px;height:16px;
+                            width:16px;vertical-align:middle;">
+                    link
+                  </mat-icon>
+                  Sources used ({{ streamSources().length }})
+                </p>
+                <div class="sources-list">
+                  @for (source of streamSources(); track source.documentId; let i = $index) {
+                    <div class="source-chip">
+                      <span class="source-rank">{{ i + 1 }}</span>
+                      <mat-icon style="font-size:13px;height:13px;
+                                width:13px;color:#6b7280;">
+                        description
+                      </mat-icon>
+                      <span class="source-name">
+                        {{ source.documentName }}
+                      </span>
+                      <p-tag
+                        [value]="getScorePercent(source.similarityScore) + '%'"
+                        severity="info"
+                        [rounded]="true"
+                        styleClass="source-score"
+                      ></p-tag>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            <!-- No answer yet and not streaming -->
+            @if (!aiAnswer() && !isStreaming() && !streamError()
+                 && !streamStatus()) {
+              <div class="empty-answer">
+                <mat-icon>chat_bubble_outline</mat-icon>
+                <p>Your AI answer will appear here</p>
+              </div>
+            }
+
+          </mat-card-content>
+
+          <!-- Footer with action -->
+          @if (aiAnswer() && !isStreaming()) {
+            <mat-divider></mat-divider>
+            <div class="answer-footer">
+              <span class="gemini-badge">
+                <mat-icon style="font-size:14px;height:14px;
+                          width:14px;color:#f59e0b;">
+                  auto_awesome
+                </mat-icon>
+                Gemini 2.5 Flash &nbsp;·&nbsp;
+                RAG ({{ chunksUsed() }} chunks)
+              </span>
+              <button
+                mat-stroked-button
+                color="primary"
+                (click)="runSearch()"
+                [disabled]="isStreaming()"
+              >
+                <mat-icon>refresh</mat-icon>
+                Regenerate
+              </button>
+            </div>
+          }
+
+        </mat-card>
+      </div>
+
+    </div>
+  }
+
+  <!-- ── Empty State (before first search) ─────────────────────── -->
+  @if (!hasSearched()) {
+    <div class="landing-state">
+      <div class="landing-content">
+
+        <!-- Animated icon -->
+        <div class="landing-icon-wrap">
+          <mat-icon class="landing-icon">manage_search</mat-icon>
+        </div>
+
+        <h2 class="landing-title">What do you want to know?</h2>
+        <p class="landing-subtitle">
+          Ask any question — our AI searches your documents and
+          answers with exact sources.
+        </p>
+
+        <!-- How it works -->
+        <div class="how-it-works">
+          <div class="step">
+            <div class="step-icon">
+              <mat-icon>text_fields</mat-icon>
+            </div>
+            <p class="step-label">You ask a question</p>
+          </div>
+          <mat-icon class="step-arrow">arrow_forward</mat-icon>
+          <div class="step">
+            <div class="step-icon">
+              <mat-icon>search</mat-icon>
+            </div>
+            <p class="step-label">AI searches your docs</p>
+          </div>
+          <mat-icon class="step-arrow">arrow_forward</mat-icon>
+          <div class="step">
+            <div class="step-icon">
+              <mat-icon>auto_awesome</mat-icon>
+            </div>
+            <p class="step-label">AI answers with sources</p>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        @if (ragStats() && ragStats()!.yourChunks > 0) {
+          <div class="landing-stats">
+            <div class="l-stat">
+              <span class="l-stat-value">
+                {{ formatNumber(ragStats()!.yourChunks) }}
+              </span>
+              <span class="l-stat-label">Chunks indexed</span>
+            </div>
+            <mat-divider vertical class="mx-4"></mat-divider>
+            <div class="l-stat">
+              <span class="l-stat-value">Semantic</span>
+              <span class="l-stat-label">Search type</span>
+            </div>
+            <mat-divider vertical class="mx-4"></mat-divider>
+            <div class="l-stat">
+              <span class="l-stat-value">Free</span>
+              <span class="l-stat-label">Ollama embeddings</span>
+            </div>
+          </div>
+        }
+
+        @if (ragStats() && ragStats()!.yourChunks === 0) {
+          <div class="no-index-warning">
+            <mat-icon>warning_amber</mat-icon>
+            <p>
+              No documents indexed yet.
+              Go to <strong>Documents</strong> and click
+              <strong>Index for Search</strong> on your uploaded files.
+            </p>
+          </div>
+        }
+
+      </div>
+    </div>
+  }
+
+</div>
