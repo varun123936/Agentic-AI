@@ -59,13 +59,13 @@ export const routes: Routes = [
   },
 
   // Admin only routes — both guards required
-//   {
-//     path: 'admin',
-//     canActivate: [authGuard, adminGuard],
-//     loadComponent: () =>
-//       import('./features/admin/admin.component')
-//         .then(m => m.AdminComponent)
-//   },
+  {
+    path: 'admin',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/admin/admin.component')
+        .then(m => m.AdminComponent)
+  },
 
   // 404
   {

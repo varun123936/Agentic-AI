@@ -1,0 +1,528 @@
+<p-toast position="top-right"></p-toast>
+
+<div class="admin-page">
+
+  <!-- ── Toolbar ───────────────────────────────────────────────── -->
+  <mat-toolbar class="page-toolbar">
+    <div class="toolbar-left">
+      <mat-icon class="toolbar-icon">admin_panel_settings</mat-icon>
+      <div>
+        <h1 class="toolbar-title">Admin Dashboard</h1>
+        <p class="toolbar-subtitle">
+          Usage analytics, user management and system health
+        </p>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <button
+        mat-stroked-button
+        (click)="loadStats(); loadUsers(); loadUsage()"
+      >
+        <mat-icon>refresh</mat-icon>
+        Refresh All
+      </button>
+      <span
+        class="health-badge"
+        [class.ok]="allSystemsOk()"
+        [class.error]="!allSystemsOk() && healthChecks().length > 0"
+      >
+        <mat-icon>
+          {{ allSystemsOk() ? 'check_circle' : 'warning_amber' }}
+        </mat-icon>
+        {{ allSystemsOk() ? 'All Systems OK' : 'Issues Detected' }}
+      </span>
+    </div>
+  </mat-toolbar>
+
+  <div class="admin-content">
+
+    <!-- ── Stat Cards Row ────────────────────────────────────────── -->
+    @if (isLoadingStats()) {
+      <div class="stat-cards">
+        @for (i of [1,2,3,4]; track i) {
+          <mat-card class="stat-card">
+            <mat-card-content>
+              <p-skeleton width="40px" height="40px"
+                          borderRadius="8px" class="mb-3">
+              </p-skeleton>
+              <p-skeleton width="80px" height="28px" class="mb-1">
+              </p-skeleton>
+              <p-skeleton width="120px" height="14px"></p-skeleton>
+            </mat-card-content>
+          </mat-card>
+        }
+      </div>
+    }
+
+    @if (!isLoadingStats() && stats()) {
+      <div class="stat-cards">
+
+        <mat-card class="stat-card">
+          <mat-card-content>
+            <div class="stat-icon-wrap blue">
+              <mat-icon>group</mat-icon>
+            </div>
+            <p class="stat-value">{{ stats()!.totalUsers }}</p>
+            <p class="stat-label">Total Users</p>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="stat-card">
+          <mat-card-content>
+            <div class="stat-icon-wrap green">
+              <mat-icon>chat_bubble</mat-icon>
+            </div>
+            <p class="stat-value">
+              {{ formatNumber(stats()!.totalConversations) }}
+            </p>
+            <p class="stat-label">Conversations</p>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="stat-card">
+          <mat-card-content>
+            <div class="stat-icon-wrap purple">
+              <mat-icon>memory</mat-icon>
+            </div>
+            <p class="stat-value">
+              {{ formatNumber(stats()!.totalTokens) }}
+            </p>
+            <p class="stat-label">Total Tokens Used</p>
+          </mat-card-content>
+        </mat-card>
+
+        <mat-card class="stat-card">
+          <mat-card-content>
+            <div class="stat-icon-wrap orange">
+              <mat-icon>payments</mat-icon>
+            </div>
+            <p class="stat-value">{{ totalCostFormatted() }}</p>
+            <p class="stat-label">Estimated Cost</p>
+          </mat-card-content>
+        </mat-card>
+
+      </div>
+    }
+
+    <!-- ── Tabs ───────────────────────────────────────────────────── -->
+    <mat-card class="tabs-card">
+    
+        <!-- Custom tab header — Bootstrap style tabs -->
+        <div class="custom-tab-header">
+            <button class="custom-tab-btn" [class.active]="activeTabIndex === 0" (click)="activeTabIndex = 0">
+                <mat-icon class="tab-icon">bar_chart</mat-icon>
+                Analytics
+            </button>
+            <button class="custom-tab-btn" [class.active]="activeTabIndex === 1" (click)="activeTabIndex = 1">
+                <mat-icon class="tab-icon">group</mat-icon>
+                Users
+                @if (users().length > 0) {
+                <span class="tab-badge">{{ users().length }}</span>
+                }
+            </button>
+            <button class="custom-tab-btn" [class.active]="activeTabIndex === 2" (click)="activeTabIndex = 2">
+                <mat-icon class="tab-icon">monitor_heart</mat-icon>
+                Health
+            </button>
+        </div>
+    
+        <mat-divider></mat-divider>
+    
+        <!-- ── Tab 1: Analytics — [hidden] keeps DOM alive ──────────── -->
+        <div [hidden]="activeTabIndex !== 0" class="tab-content">
+    
+            @if (isLoadingUsage()) {
+            <app-loading-spinner message="Loading analytics...">
+            </app-loading-spinner>
+            }
+    
+            @if (!isLoadingUsage() && usage()) {
+    
+            <div class="charts-row">
+    
+                <!-- 7-day trend chart -->
+                <mat-card class="chart-card">
+                    <mat-card-header>
+                        <mat-card-title class="chart-title">
+                            <mat-icon color="primary">timeline</mat-icon>
+                            7-Day Usage Trend
+                        </mat-card-title>
+                        <mat-card-subtitle>
+                            Tokens and requests per day
+                        </mat-card-subtitle>
+                    </mat-card-header>
+                    <mat-divider></mat-divider>
+                    <mat-card-content class="chart-body">
+                        @if (trendChartData()) {
+                        <p-chart type="line" [data]="trendChartData()" [options]="trendChartOptions()"
+                            height="280px"></p-chart>
+                        } @else {
+                        <div class="no-chart-data">
+                            <mat-icon>show_chart</mat-icon>
+                            <p>No trend data yet</p>
+                        </div>
+                        }
+                    </mat-card-content>
+                </mat-card>
+    
+                <!-- Provider doughnut chart -->
+                <mat-card class="chart-card chart-card-sm">
+                    <mat-card-header>
+                        <mat-card-title class="chart-title">
+                            <mat-icon color="primary">donut_large</mat-icon>
+                            By Provider
+                        </mat-card-title>
+                        <mat-card-subtitle>
+                            Token distribution
+                        </mat-card-subtitle>
+                    </mat-card-header>
+                    <mat-divider></mat-divider>
+                    <mat-card-content class="chart-body">
+                        @if (providerChartData() &&
+                        usage()!.byProvider.length > 0) {
+                        <p-chart type="doughnut" [data]="providerChartData()" [options]="providerChartOptions()"
+                            height="280px"></p-chart>
+                        } @else {
+                        <div class="no-chart-data">
+                            <mat-icon>donut_large</mat-icon>
+                            <p>No provider data yet</p>
+                        </div>
+                        }
+                    </mat-card-content>
+                </mat-card>
+    
+            </div>
+    
+            <!-- Provider breakdown table -->
+            @if (usage()!.byProvider.length > 0) {
+            <mat-card class="table-card mt-4">
+                <mat-card-header>
+                    <mat-card-title class="chart-title">
+                        <mat-icon color="primary">table_chart</mat-icon>
+                        Provider Breakdown
+                    </mat-card-title>
+                </mat-card-header>
+                <mat-divider></mat-divider>
+                <mat-card-content class="p-0">
+                    <p-table [value]="usage()!.byProvider" styleClass="p-datatable-sm">
+                        <ng-template pTemplate="header">
+                            <tr>
+                                <th>Provider</th>
+                                <th class="text-center">Requests</th>
+                                <th class="text-center">Total Tokens</th>
+                                <th class="text-center">Est. Cost</th>
+                            </tr>
+                        </ng-template>
+                        <ng-template pTemplate="body" let-row>
+                            <tr>
+                                <td>
+                                    <div class="provider-cell">
+                                        <mat-icon class="provider-icon">
+                                            {{ getProviderName(row._id) === 'gemini'
+                                            ? 'auto_awesome' : 'computer' }}
+                                        </mat-icon>
+                                        <span class="provider-name">
+                                            {{ getProviderName(row._id) | titlecase }}
+                                        </span>
+                                        @if (getProviderName(row._id) === 'ollama') {
+                                        <p-tag value="Free" severity="success" [rounded]="true"></p-tag>
+                                        }
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    {{ formatNumber(row.requestCount) }}
+                                </td>
+                                <td class="text-center">
+                                    {{ formatNumber(row.totalTokens) }}
+                                </td>
+                                <td class="text-center">
+                                    <span [class.text-success]="
+                            getProviderName(row._id) === 'ollama'">
+                                        {{ formatCost(row.totalCostUsd) }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </ng-template>
+                    </p-table>
+                </mat-card-content>
+            </mat-card>
+            }
+    
+            }
+    
+        </div>
+    
+        <!-- ── Tab 2: Users — [hidden] keeps DOM alive ───────────────── -->
+        <div [hidden]="activeTabIndex !== 1" class="tab-content">
+    
+            @if (isLoadingUsers()) {
+            <app-loading-spinner message="Loading users...">
+            </app-loading-spinner>
+            }
+    
+            @if (!isLoadingUsers() && users().length > 0) {
+            <p-table [value]="users()" [paginator]="users().length > 10" [rows]="10"
+                styleClass="p-datatable-sm p-datatable-striped" responsiveLayout="scroll">
+                <ng-template pTemplate="header">
+                    <tr>
+                        <th pSortableColumn="name">
+                            User <p-sortIcon field="name"></p-sortIcon>
+                        </th>
+                        <th class="text-center">Role</th>
+                        <th class="text-center">Status</th>
+                        <th pSortableColumn="tokensUsedToday">
+                            Today's Usage
+                            <p-sortIcon field="tokensUsedToday"></p-sortIcon>
+                        </th>
+                        <th>Last Login</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </ng-template>
+    
+                <ng-template pTemplate="body" let-user>
+                    <tr>
+                        <td>
+                            <div class="user-cell">
+                                <div class="user-avatar">
+                                    {{ user.name.charAt(0).toUpperCase() }}
+                                </div>
+                                <div class="user-info">
+                                    <p class="user-name">{{ user.name }}</p>
+                                    <p class="user-email">{{ user.email }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <p-tag [value]="user.role | titlecase" [severity]="getRoleSeverity(user.role)"
+                                [rounded]="true"></p-tag>
+                        </td>
+                        <td class="text-center">
+                            <p-tag [value]="user.isActive ? 'Active' : 'Inactive'"
+                                [severity]="user.isActive ? 'success' : 'danger'" [rounded]="true"></p-tag>
+                        </td>
+                        <td>
+                            <div class="usage-cell">
+                                <div class="usage-numbers">
+                                    <span class="usage-used">
+                                        {{ formatNumber(user.tokensUsedToday) }}
+                                    </span>
+                                    <span class="usage-sep">/</span>
+                                    <span class="usage-limit">
+                                        {{ formatNumber(user.dailyTokenLimit) }}
+                                    </span>
+                                </div>
+                                <mat-progress-bar mode="determinate" [value]="getUsagePercent(user)"
+                                    [color]="getUsageColor(user)" class="usage-bar"></mat-progress-bar>
+                                <span class="usage-pct">
+                                    {{ getUsagePercent(user) }}%
+                                </span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="date-text">
+                                {{ formatDate(user.lastLoginAt) }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <button pButton icon="pi pi-sliders-h" pTooltip="Update token limit" tooltipPosition="top"
+                                severity="secondary" size="small" (click)="openTokenDialog(user)"></button>
+                        </td>
+                    </tr>
+                </ng-template>
+    
+            </p-table>
+            }
+    
+            @if (!isLoadingUsers() && users().length === 0) {
+            <div class="empty-tab">
+                <mat-icon>group_off</mat-icon>
+                <p>No users found</p>
+            </div>
+            }
+    
+        </div>
+    
+        <!-- ── Tab 3: Health — [hidden] keeps DOM alive ──────────────── -->
+        <div [hidden]="activeTabIndex !== 2" class="tab-content">
+    
+            <div class="health-header">
+                <p class="health-desc">
+                    Live status of all backend services
+                </p>
+                <button mat-stroked-button color="primary" (click)="runHealthChecks()" [disabled]="isCheckingHealth()">
+                    <mat-icon>refresh</mat-icon>
+                    {{ isCheckingHealth() ? 'Checking...' : 'Run Checks' }}
+                </button>
+            </div>
+    
+            <div class="health-grid">
+                @for (check of healthChecks(); track check.service) {
+                <mat-card class="health-card" [class.health-ok]="check.status === 'ok'"
+                    [class.health-error]="check.status === 'error'" [class.health-checking]="check.status === 'checking'">
+                    <mat-card-content>
+                        <div class="health-card-top">
+                            <div class="health-status-icon" [style.background]="getHealthColor(check.status) + '22'">
+                                @if (check.status === 'checking') {
+                                <mat-icon class="spin" [style.color]="getHealthColor(check.status)">
+                                    sync
+                                </mat-icon>
+                                } @else {
+                                <mat-icon [style.color]="getHealthColor(check.status)">
+                                    {{ getHealthIcon(check.status) }}
+                                </mat-icon>
+                                }
+                            </div>
+                            <p-tag [value]="check.status === 'checking'
+                      ? 'Checking'
+                      : check.status === 'ok'
+                      ? 'Online'
+                      : 'Offline'" [severity]="getHealthSeverity(check.status)" [rounded]="true"></p-tag>
+                        </div>
+                        <h3 class="health-service-name">{{ check.service }}</h3>
+                        <p class="health-detail">{{ check.detail }}</p>
+                        @if (check.latencyMs !== undefined) {
+                        <div class="health-latency">
+                            <mat-icon style="font-size:12px;
+                              height:12px;width:12px;">
+                                timer
+                            </mat-icon>
+                            {{ check.latencyMs }}ms
+                        </div>
+                        }
+                    </mat-card-content>
+                </mat-card>
+                }
+    
+                @if (healthChecks().length === 0) {
+                <div class="empty-tab" style="grid-column: 1/-1;">
+                    <mat-icon>monitor_heart</mat-icon>
+                    <p>Click "Run Checks" to check system health</p>
+                </div>
+                }
+    
+            </div>
+    
+        </div>
+    
+    </mat-card>
+
+  </div>
+</div>
+
+<!-- ══ Token Limit Dialog ════════════════════════════════════════ -->
+<p-dialog
+  header="Update Token Limit"
+  [(visible)]="showTokenDialog"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  [style]="{ width: '440px' }"
+  (onHide)="closeTokenDialog()"
+>
+  <ng-template pTemplate="header">
+    <div class="dialog-header">
+      <mat-icon color="primary">tune</mat-icon>
+      <span>Update Daily Token Limit</span>
+    </div>
+  </ng-template>
+
+  @if (selectedUser()) {
+    <div class="token-dialog-body">
+
+      <!-- User info -->
+      <div class="dialog-user-row">
+        <div class="dialog-avatar">
+          {{ selectedUser()!.name.charAt(0).toUpperCase() }}
+        </div>
+        <div>
+          <p class="dialog-user-name">{{ selectedUser()!.name }}</p>
+          <p class="dialog-user-email">{{ selectedUser()!.email }}</p>
+        </div>
+      </div>
+
+      <mat-divider class="my-3"></mat-divider>
+
+      <!-- Current usage -->
+      <div class="current-usage-row">
+        <div class="current-usage-item">
+          <p class="cu-label">Current Limit</p>
+          <p class="cu-value">
+            {{ formatNumber(selectedUser()!.dailyTokenLimit) }}
+          </p>
+        </div>
+        <mat-icon class="cu-arrow">arrow_forward</mat-icon>
+        <div class="current-usage-item">
+          <p class="cu-label">New Limit</p>
+          <p class="cu-value text-primary">
+            {{ formatNumber(newTokenLimit()) }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Knob input -->
+      <div class="knob-section">
+        <p class="knob-label">
+          Drag to set limit
+          ({{ formatNumber(newTokenLimit()) }} tokens/day)
+        </p>
+        <p-knob
+          [(ngModel)]="newTokenLimit"
+          [min]="1000"
+          [max]="1000000"
+          [step]="1000"
+          valueColor="#1a56db"
+          rangeColor="#e5e7eb"
+          [size]="120"
+        ></p-knob>
+      </div>
+
+      <!-- Preset buttons -->
+      <div class="preset-row">
+        <p class="preset-label">Quick presets:</p>
+        <div class="presets">
+          @for (preset of [10000, 50000, 100000, 500000]; track preset) {
+            <button
+              mat-stroked-button
+              class="preset-btn"
+              [class.active]="newTokenLimit() === preset"
+              (click)="newTokenLimit.set(preset)"
+            >
+              {{ formatNumber(preset) }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- Warning if lowering limit -->
+      @if (newTokenLimit() < selectedUser()!.dailyTokenLimit) {
+        <div class="limit-warning">
+          <mat-icon>info</mat-icon>
+          <span>
+            This is lower than the current limit.
+            The user may hit their limit sooner today.
+          </span>
+        </div>
+      }
+
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    <button
+      pButton
+      label="Cancel"
+      severity="secondary"
+      [disabled]="isUpdatingLimit()"
+      (click)="closeTokenDialog()"
+    ></button>
+    <button
+      pButton
+      label="Save Limit"
+      icon="pi pi-check"
+      [loading]="isUpdatingLimit()"
+      [disabled]="newTokenLimit() < 1000"
+      (click)="saveTokenLimit()"
+    ></button>
+  </ng-template>
+
+</p-dialog>
