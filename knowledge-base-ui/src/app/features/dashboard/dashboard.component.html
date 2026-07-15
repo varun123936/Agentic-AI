@@ -1,0 +1,387 @@
+<p-toast position="top-right"></p-toast>
+
+<div class="dashboard-page">
+
+  <!-- ── Hero welcome banner ──────────────────────────────────── -->
+  <div class="hero-banner">
+    <div class="hero-content">
+      <div class="hero-text">
+        <h1 class="hero-greeting">
+          {{ greeting() }},
+          <span class="hero-name">
+            {{ currentUser()?.name?.split(' ')?.[0] ?? 'User' }}
+          </span>
+          👋
+        </h1>
+        <p class="hero-subtitle">
+          Your AI-powered knowledge base is ready.
+          Ask questions, search documents, or continue a conversation.
+        </p>
+      </div>
+      <button
+        mat-raised-button
+        class="hero-cta"
+        (click)="startNewChat()"
+      >
+        <mat-icon>add_comment</mat-icon>
+        New Conversation
+      </button>
+    </div>
+  </div>
+
+  <div class="dashboard-content">
+
+    <!-- ── Stat cards row ───────────────────────────────────────── -->
+    <div class="stat-cards">
+
+      <!-- Token usage card -->
+      <mat-card class="stat-card token-card">
+        <mat-card-content>
+          <div class="stat-header">
+            <div class="stat-icon-wrap blue">
+              <mat-icon>memory</mat-icon>
+            </div>
+            <div class="stat-texts">
+              <p class="stat-value">
+                {{ formatNumber(currentUser()?.tokensUsedToday || 0) }}
+              </p>
+              <p class="stat-label">Tokens Used Today</p>
+            </div>
+          </div>
+          <div class="token-bar-section">
+            <mat-progress-bar
+              mode="determinate"
+              [value]="tokenUsagePercent()"
+              [color]="getTokenBarColor()"
+              class="token-bar"
+            ></mat-progress-bar>
+            <div class="token-bar-labels">
+              <small class="text-muted">
+                {{ tokenUsagePercent() }}% used
+              </small>
+              <small class="text-muted">
+                {{ formatNumber(tokensRemaining()) }} remaining
+              </small>
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- Conversations card -->
+      <mat-card class="stat-card">
+        <mat-card-content>
+          <div class="stat-header">
+            <div class="stat-icon-wrap green">
+              <mat-icon>chat_bubble</mat-icon>
+            </div>
+            <div class="stat-texts">
+              <p class="stat-value">
+                {{ recentConversations().length }}+
+              </p>
+              <p class="stat-label">Conversations</p>
+            </div>
+          </div>
+          <a
+            routerLink="/conversations"
+            class="stat-link"
+          >
+            View all history
+            <mat-icon class="stat-link-icon">arrow_forward</mat-icon>
+          </a>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- Documents card -->
+      <mat-card class="stat-card">
+        <mat-card-content>
+          <div class="stat-header">
+            <div class="stat-icon-wrap purple">
+              <mat-icon>description</mat-icon>
+            </div>
+            <div class="stat-texts">
+              <p class="stat-value">{{ totalDocuments() }}</p>
+              <p class="stat-label">Documents</p>
+            </div>
+          </div>
+          <div class="doc-indexed-row">
+            <span class="indexed-count">
+              <mat-icon style="font-size:13px;
+                        height:13px;width:13px;">
+                done_all
+              </mat-icon>
+              {{ indexedDocuments() }} indexed
+            </span>
+            <span class="not-indexed-count">
+              {{ totalDocuments() - indexedDocuments() }} pending
+            </span>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <!-- RAG chunks card -->
+      <mat-card class="stat-card">
+        <mat-card-content>
+          <div class="stat-header">
+            <div class="stat-icon-wrap orange">
+              <mat-icon>storage</mat-icon>
+            </div>
+            <div class="stat-texts">
+              <p class="stat-value">
+                {{ formatNumber(ragChunks()) }}
+              </p>
+              <p class="stat-label">Chunks Indexed</p>
+            </div>
+          </div>
+          <a routerLink="/rag" class="stat-link">
+            Search knowledge base
+            <mat-icon class="stat-link-icon">arrow_forward</mat-icon>
+          </a>
+        </mat-card-content>
+      </mat-card>
+
+    </div>
+
+    <div class="main-grid">
+
+      <!-- ── Left column ─────────────────────────────────────────── -->
+      <div class="left-col">
+
+        <!-- Quick actions -->
+        <mat-card class="section-card">
+          <mat-card-header>
+            <mat-card-title class="section-title">
+              <mat-icon color="primary">bolt</mat-icon>
+              Quick Actions
+            </mat-card-title>
+          </mat-card-header>
+          <mat-divider></mat-divider>
+          <mat-card-content class="quick-actions-grid">
+            @for (action of quickActions; track action.route) {
+              <button
+                class="quick-action-btn"
+                [class]="'qa-' + action.color"
+                [routerLink]="action.route"
+              >
+                <div class="qa-icon">
+                  <mat-icon>{{ action.icon }}</mat-icon>
+                </div>
+                <div class="qa-text">
+                  <p class="qa-label">{{ action.label }}</p>
+                  <p class="qa-desc">{{ action.description }}</p>
+                </div>
+                <mat-icon class="qa-arrow">
+                  chevron_right
+                </mat-icon>
+              </button>
+            }
+          </mat-card-content>
+        </mat-card>
+
+        <!-- Token budget detail -->
+        <mat-card class="section-card mt-4">
+          <mat-card-header>
+            <mat-card-title class="section-title">
+              <mat-icon color="primary">speed</mat-icon>
+              Daily Token Budget
+            </mat-card-title>
+          </mat-card-header>
+          <mat-divider></mat-divider>
+          <mat-card-content class="budget-content">
+
+            <div class="budget-ring-row">
+              <div class="budget-ring-wrap">
+                <svg viewBox="0 0 100 100"
+                     class="budget-ring-svg">
+                  <circle
+                    cx="50" cy="50" r="42"
+                    fill="none"
+                    stroke="#e5e7eb"
+                    stroke-width="10"
+                  />
+                  <circle
+                    cx="50" cy="50" r="42"
+                    fill="none"
+                    [attr.stroke]="tokenUsagePercent() >= 90
+                      ? '#dc2626'
+                      : tokenUsagePercent() >= 60
+                      ? '#d97706' : '#1a56db'"
+                    stroke-width="10"
+                    stroke-linecap="round"
+                    stroke-dasharray="264"
+                    [attr.stroke-dashoffset]="
+                      264 - (264 * tokenUsagePercent() / 100)"
+                    transform="rotate(-90 50 50)"
+                    class="ring-progress"
+                  />
+                  <text
+                    x="50" y="46"
+                    text-anchor="middle"
+                    class="ring-pct-text"
+                  >
+                    {{ tokenUsagePercent() }}%
+                  </text>
+                  <text
+                    x="50" y="60"
+                    text-anchor="middle"
+                    class="ring-label-text"
+                  >
+                    used
+                  </text>
+                </svg>
+              </div>
+
+              <div class="budget-details">
+                <div class="budget-row">
+                  <span class="budget-key">Used today</span>
+                  <span class="budget-val">
+                    {{ formatNumber(
+                       currentUser()?.tokensUsedToday || 0) }}
+                  </span>
+                </div>
+                <mat-divider></mat-divider>
+                <div class="budget-row">
+                  <span class="budget-key">Remaining</span>
+                  <span class="budget-val text-success">
+                    {{ formatNumber(tokensRemaining()) }}
+                  </span>
+                </div>
+                <mat-divider></mat-divider>
+                <div class="budget-row">
+                  <span class="budget-key">Daily limit</span>
+                  <span class="budget-val">
+                    {{ formatNumber(
+                       currentUser()?.dailyTokenLimit || 0) }}
+                  </span>
+                </div>
+                <mat-divider></mat-divider>
+                <div class="budget-row">
+                  <span class="budget-key">Resets at</span>
+                  <span class="budget-val">Midnight</span>
+                </div>
+              </div>
+
+            </div>
+
+            @if (tokenUsagePercent() >= 80) {
+              <div class="budget-warning">
+                <mat-icon>warning_amber</mat-icon>
+                <span>
+                  You've used {{ tokenUsagePercent() }}% of your
+                  daily limit. Contact admin to increase your limit.
+                </span>
+              </div>
+            }
+
+          </mat-card-content>
+        </mat-card>
+
+      </div>
+
+      <!-- ── Right column: Recent conversations ─────────────────── -->
+      <div class="right-col">
+        <mat-card class="section-card h-100">
+          <mat-card-header>
+            <mat-card-title class="section-title">
+              <mat-icon color="primary">history</mat-icon>
+              Recent Conversations
+            </mat-card-title>
+            <div class="section-header-actions">
+              <a
+                routerLink="/conversations"
+                class="view-all-link"
+              >
+                View all
+                <mat-icon>arrow_forward</mat-icon>
+              </a>
+            </div>
+          </mat-card-header>
+          <mat-divider></mat-divider>
+          <mat-card-content class="conv-list-body">
+
+            @if (isLoadingConvs()) {
+              @for (i of [1,2,3,4]; track i) {
+                <div class="conv-skeleton">
+                  <p-skeleton
+                    shape="circle"
+                    size="36px"
+                  ></p-skeleton>
+                  <div class="conv-skeleton-lines">
+                    <p-skeleton
+                      width="70%"
+                      height="13px"
+                    ></p-skeleton>
+                    <p-skeleton
+                      width="45%"
+                      height="11px"
+                      class="mt-1"
+                    ></p-skeleton>
+                  </div>
+                </div>
+              }
+            }
+
+            @if (!isLoadingConvs()
+                 && recentConversations().length === 0) {
+              <div class="empty-convs">
+                <mat-icon>chat_bubble_outline</mat-icon>
+                <p>No conversations yet</p>
+                <button
+                  mat-raised-button
+                  color="primary"
+                  (click)="startNewChat()"
+                >
+                  Start your first chat
+                </button>
+              </div>
+            }
+
+            @for (conv of recentConversations(); track conv._id) {
+              <button
+                class="conv-item"
+                (click)="openConversation(conv)"
+              >
+                <div class="conv-avatar">
+                  <mat-icon>chat</mat-icon>
+                </div>
+                <div class="conv-details">
+                  <p class="conv-title">
+                    {{ conv.title || 'New Conversation' }}
+                  </p>
+                  <div class="conv-meta">
+                    <span>
+                      <mat-icon style="font-size:11px;
+                                height:11px;width:11px;">
+                        chat_bubble
+                      </mat-icon>
+                      {{ conv.messageCount }} messages
+                    </span>
+                    <span>
+                      <mat-icon style="font-size:11px;
+                                height:11px;width:11px;">
+                        schedule
+                      </mat-icon>
+                      {{ formatDate(conv.lastMessageAt) }}
+                    </span>
+                  </div>
+                </div>
+                <mat-icon class="conv-arrow">chevron_right</mat-icon>
+              </button>
+              <mat-divider></mat-divider>
+            }
+
+            @if (recentConversations().length > 0) {
+            <div class="conv-list-footer">
+              <a routerLink="/conversations" class="see-more-link">
+                See all conversations
+                <mat-icon>arrow_forward</mat-icon>
+              </a>
+            </div>
+            }
+
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+    </div>
+  </div>
+</div>

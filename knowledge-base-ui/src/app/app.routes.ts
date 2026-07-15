@@ -1,10 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
-// import { DashboardComponent } from './features/dashboard/dashboard/dashboard.component';
-// import { NotFoundComponent } from './features/not-found/not-found/not-found.component';
-// import { ChatComponent } from './features/chat/chat.component';
-
 
 export const routes: Routes = [
   // Default redirect
@@ -33,7 +29,7 @@ export const routes: Routes = [
     path: 'dashboard',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./features/dashboard/dashboard/dashboard.component')
+      import('./features/dashboard/dashboard.component')
         .then(m => m.DashboardComponent)
   },
   {
@@ -56,6 +52,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/rag/rag.component')
         .then(m => m.RagComponent)
+  },
+  {
+  path: 'conversations',
+  canActivate: [authGuard],
+  loadComponent: () =>
+    import('./features/conversations/conversations.component')
+      .then(m => m.ConversationsComponent)
   },
 
   // Admin only routes — both guards required

@@ -1,0 +1,206 @@
+/* ── Page ────────────────────────────────────────────────────── */
+.convs-page {
+  min-height: calc(100vh - 57px);
+  background: #f4f6f9;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────── */
+.page-toolbar {
+  background: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+  padding: 10px 20px !important;
+  height: auto !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toolbar-icon {
+  font-size: 26px;
+  width: 26px;
+  height: 26px;
+  color: #1a56db;
+}
+
+.toolbar-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.toolbar-subtitle {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Content ─────────────────────────────────────────────────── */
+.convs-content {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ── Summary row ─────────────────────────────────────────────── */
+.summary-row {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 80px;
+}
+
+.summary-val {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #1a56db;
+}
+
+.summary-label {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 500;
+}
+
+/* ── Main card ───────────────────────────────────────────────── */
+.main-card {
+  border-radius: 12px !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+  overflow: hidden;
+}
+
+.main-card mat-card-content.p-0 {
+  padding: 0 !important;
+}
+
+/* ── Search bar ──────────────────────────────────────────────── */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+.search-field { flex: 1; }
+
+.result-count {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* ── Empty state ─────────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.empty-state mat-icon {
+  font-size: 48px;
+  height: 48px;
+  width: 48px;
+  display: block;
+  margin: 0 auto 16px;
+  color: #d1d5db;
+}
+
+.empty-state p {
+  font-size: 0.95rem;
+  color: #6b7280;
+  margin-bottom: 20px;
+}
+
+/* ── Conversation table row ──────────────────────────────────── */
+.conv-row {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.conv-row:hover { background: #f0f4ff !important; }
+
+.conv-title-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.conv-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #1d4ed8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.conv-icon mat-icon {
+  font-size: 17px;
+  height: 17px;
+  width: 17px;
+}
+
+.conv-title-info { min-width: 0; }
+
+.conv-title-text {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 3px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 380px;
+}
+
+.conv-created {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.token-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.82rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.last-active {
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.mx-3 { margin-left: 12px; margin-right: 12px; }

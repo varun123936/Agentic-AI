@@ -58,6 +58,23 @@ export class ChatComponent implements OnInit, OnDestroy, AfterViewChecked {
   // ── Lifecycle ─────────────────────────────────────────────────
   ngOnInit(): void {
     this.loadConversations();
+
+    // Check if a conversation was selected from dashboard/history
+  const selectedId = sessionStorage.getItem('selectedConvId');
+  if (selectedId) {
+    sessionStorage.removeItem('selectedConvId');
+    // Wait for conversations to load, then select
+    this.chatService.getConversations().subscribe({
+      next: res => {
+        const convs = res.data || [];
+        const target = convs.find(c => c._id === selectedId);
+        if (target) {
+          this.conversations.set(convs);
+          this.selectConversation(target);
+        }
+      }
+    });
+  }
   }
 
   ngAfterViewChecked(): void {

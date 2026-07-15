@@ -1,0 +1,270 @@
+<p-toast position="top-right"></p-toast>
+<p-confirmDialog></p-confirmDialog>
+
+<div class="convs-page">
+
+  <!-- ── Toolbar ───────────────────────────────────────────────── -->
+  <mat-toolbar class="page-toolbar">
+    <div class="toolbar-left">
+      <button
+        mat-icon-button
+        routerLink="/dashboard"
+        matTooltip="Back to Dashboard"
+      >
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <mat-icon class="toolbar-icon">history</mat-icon>
+      <div>
+        <h1 class="toolbar-title">Conversation History</h1>
+        <p class="toolbar-subtitle">
+          Browse and resume all past AI conversations
+        </p>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <button
+        mat-raised-button
+        color="primary"
+        routerLink="/chat"
+      >
+        <mat-icon>add_comment</mat-icon>
+        New Chat
+      </button>
+    </div>
+  </mat-toolbar>
+
+  <div class="convs-content">
+
+    <!-- ── Summary stat row ──────────────────────────────────────── -->
+    @if (!isLoading() && conversations().length > 0) {
+      <div class="summary-row">
+        <div class="summary-stat">
+          <span class="summary-val">
+            {{ conversations().length }}
+          </span>
+          <span class="summary-label">Conversations</span>
+        </div>
+        <mat-divider vertical class="mx-3"></mat-divider>
+        <div class="summary-stat">
+          <span class="summary-val">
+            {{ getTotalMessages() }}
+          </span>
+          <span class="summary-label">Total Messages</span>
+        </div>
+        <mat-divider vertical class="mx-3"></mat-divider>
+        <div class="summary-stat">
+          <span class="summary-val">
+            {{ formatTokens(getTotalTokens()) }}
+          </span>
+          <span class="summary-label">Tokens Used</span>
+        </div>
+      </div>
+    }
+
+    <mat-card class="main-card">
+      <mat-card-content class="p-0">
+
+        <!-- Search bar -->
+        <div class="search-bar">
+          <mat-form-field
+            appearance="outline"
+            class="search-field"
+            subscriptSizing="dynamic"
+          >
+            <mat-icon matPrefix>search</mat-icon>
+            <input
+              matInput
+              placeholder="Search conversations by title..."
+              [ngModel]="searchQuery()"
+              (ngModelChange)="searchQuery.set($event)"
+            />
+            @if (searchQuery()) {
+              <button
+                matSuffix
+                mat-icon-button
+                (click)="searchQuery.set('')"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            }
+          </mat-form-field>
+
+          <span class="result-count">
+            {{ filtered().length }}
+            {{ filtered().length === 1
+               ? 'conversation' : 'conversations' }}
+          </span>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <!-- Loading state -->
+        @if (isLoading()) {
+          <app-loading-spinner
+            message="Loading conversations..."
+          ></app-loading-spinner>
+        }
+
+        <!-- Empty state -->
+        @if (!isLoading() && filtered().length === 0) {
+          <div class="empty-state">
+            <mat-icon>chat_bubble_outline</mat-icon>
+            @if (searchQuery()) {
+              <p>No conversations match "{{ searchQuery() }}"</p>
+              <button
+                mat-stroked-button
+                (click)="searchQuery.set('')"
+              >
+                Clear search
+              </button>
+            } @else {
+              <p>No conversations yet</p>
+              <button
+                mat-raised-button
+                color="primary"
+                routerLink="/chat"
+              >
+                Start your first conversation
+              </button>
+            }
+          </div>
+        }
+
+        <!-- PrimeNG table -->
+        @if (!isLoading() && filtered().length > 0) {
+          <p-table
+            [value]="filtered()"
+            [paginator]="filtered().length > 15"
+            [rows]="15"
+            [rowsPerPageOptions]="[10, 15, 25, 50]"
+            styleClass="p-datatable-sm p-datatable-striped"
+            responsiveLayout="scroll"
+            sortField="lastMessageAt"
+            [sortOrder]="-1"
+          >
+            <ng-template pTemplate="header">
+              <tr>
+                <th
+                  pSortableColumn="title"
+                  style="width: 40%"
+                >
+                  Title
+                  <p-sortIcon field="title"></p-sortIcon>
+                </th>
+                <th
+                  class="text-center"
+                  pSortableColumn="messageCount"
+                  style="width: 12%"
+                >
+                  Messages
+                  <p-sortIcon field="messageCount"></p-sortIcon>
+                </th>
+                <th
+                  class="text-center"
+                  pSortableColumn="totalTokensUsed"
+                  style="width: 14%"
+                >
+                  Tokens
+                  <p-sortIcon field="totalTokensUsed"></p-sortIcon>
+                </th>
+                <th
+                  pSortableColumn="lastMessageAt"
+                  style="width: 20%"
+                >
+                  Last Active
+                  <p-sortIcon field="lastMessageAt"></p-sortIcon>
+                </th>
+                <th
+                  class="text-center"
+                  style="width: 14%"
+                >
+                  Actions
+                </th>
+              </tr>
+            </ng-template>
+
+            <ng-template pTemplate="body" let-conv>
+              <tr
+                class="conv-row"
+                (click)="resumeConversation(conv)"
+              >
+                <!-- Title -->
+                <td>
+                  <div class="conv-title-cell">
+                    <div class="conv-icon">
+                      <mat-icon>chat</mat-icon>
+                    </div>
+                    <div class="conv-title-info">
+                      <p class="conv-title-text">
+                        {{ conv.title || 'New Conversation' }}
+                      </p>
+                      <p class="conv-created">
+                        Created {{ formatRelative(conv.createdAt) }}
+                      </p>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Message count -->
+                <td class="text-center">
+                  <p-tag
+                    [value]="conv.messageCount + ' msgs'"
+                    [severity]="getMessageSeverity(conv.messageCount)"
+                    [rounded]="true"
+                  ></p-tag>
+                </td>
+
+                <!-- Tokens -->
+                <td class="text-center">
+                  <span class="token-count">
+                    <mat-icon style="font-size:12px;
+                              height:12px;width:12px;">
+                      memory
+                    </mat-icon>
+                    {{ formatTokens(conv.totalTokensUsed) }}
+                  </span>
+                </td>
+
+                <!-- Last active -->
+                <td>
+                  <span
+                    class="last-active"
+                    [pTooltip]="formatDate(conv.lastMessageAt)"
+                    tooltipPosition="top"
+                  >
+                    {{ formatRelative(conv.lastMessageAt) }}
+                  </span>
+                </td>
+
+                <!-- Actions -->
+                <td class="text-center" (click)="$event.stopPropagation()">
+                  <button
+                    pButton
+                    icon="pi pi-play"
+                    severity="info"
+                    size="small"
+                    pTooltip="Resume conversation"
+                    tooltipPosition="top"
+                    (click)="resumeConversation(conv)"
+                  ></button>
+                </td>
+
+              </tr>
+            </ng-template>
+
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td colspan="5" class="text-center py-4 text-muted">
+                  No conversations found
+                </td>
+              </tr>
+            </ng-template>
+
+          </p-table>
+        }
+
+      </mat-card-content>
+    </mat-card>
+
+  </div>
+</div>
