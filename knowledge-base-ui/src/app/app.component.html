@@ -1,125 +1,263 @@
-<!-- Show navbar only when logged in and not on auth pages -->
-@if (authService.isLoggedIn() && !isAuthPage()) {
-  <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
-    <div class="container-fluid px-4">
+<!-- Global top loading bar -->
+<app-global-loader></app-global-loader>
 
-      <!-- Brand -->
-      <a class="navbar-brand fw-bold text-primary" routerLink="/dashboard">
-        <i class="bi bi-braces-asterisk me-2"></i>Knowledge Base AI
+<!-- Navbar — only when logged in and not on auth pages -->
+@if (isLoggedIn() && !isAuthPage()) {
+  <nav class="app-navbar">
+
+    <!-- Brand -->
+    <a class="navbar-brand" routerLink="/dashboard">
+      <div class="brand-icon">
+        <span>AI</span>
+      </div>
+      <span class="brand-name">Knowledge Base</span>
+    </a>
+
+    <!-- Desktop nav links -->
+    <div class="nav-links">
+
+      <a
+        class="nav-link"
+        routerLink="/dashboard"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+      >
+        <span class="nav-icon">⚡</span>
+        Dashboard
       </a>
 
-      <!-- Mobile toggle -->
-      <button
-        class="navbar-toggler border-0"
-        type="button"
-        data-bs-toggle="collapse"
-        data-bs-target="#mainNav"
-        aria-controls="mainNav"
-        aria-expanded="false"
-        aria-label="Toggle navigation"
+      <a
+        class="nav-link"
+        routerLink="/chat"
+        routerLinkActive="active"
       >
-        <span class="navbar-toggler-icon"></span>
-      </button>
+        <span class="nav-icon">💬</span>
+        Chat
+      </a>
 
-      <!-- Nav links -->
-      <div class="collapse navbar-collapse" id="mainNav">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item">
-            <a class="nav-link" routerLink="/dashboard"
-               routerLinkActive="active fw-medium">
-              <i class="bi bi-speedometer2 me-1"></i>Dashboard
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" routerLink="/chat"
-               routerLinkActive="active fw-medium">
-              <i class="bi bi-chat-dots me-1"></i>Chat
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" routerLink="/documents"
-               routerLinkActive="active fw-medium">
-              <i class="bi bi-file-earmark-text me-1"></i>Documents
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" routerLink="/rag"
-               routerLinkActive="active fw-medium">
-              <i class="bi bi-search me-1"></i>Search
-            </a>
-          </li>
-          <a class="nav-link" routerLink="/conversations" routerLinkActive="active fw-medium">
-            <i class="bi bi-clock-history me-1"></i>History
-          </a>
+      <a
+        class="nav-link"
+        routerLink="/documents"
+        routerLinkActive="active"
+      >
+        <span class="nav-icon">📁</span>
+        Documents
+      </a>
 
-          <!-- Admin only -->
-          @if (authService.isAdmin()) {
-            <li class="nav-item">
-              <a class="nav-link text-purple-600" routerLink="/admin"
-                 routerLinkActive="active fw-medium">
-                <i class="bi bi-shield-check me-1"></i>Admin
-              </a>
-            </li>
-          }
-        </ul>
+      <a
+        class="nav-link"
+        routerLink="/rag"
+        routerLinkActive="active"
+      >
+        <span class="nav-icon">🔍</span>
+        Search
+      </a>
 
-        <!-- Right side — user info + logout -->
-        <div class="d-flex align-items-center gap-3">
+      <a
+        class="nav-link"
+        routerLink="/conversations"
+        routerLinkActive="active"
+      >
+        <span class="nav-icon">🕐</span>
+        History
+      </a>
 
-          <!-- Token usage badge -->
-          <span class="badge bg-light text-muted border small">
-            <i class="bi bi-cpu me-1"></i>
-            {{ authService.currentUser()?.tokensUsedToday | number }}
-            /
-            {{ authService.currentUser()?.dailyTokenLimit | number }}
-            tokens
+      @if (isAdmin()) {
+        <a
+          class="nav-link admin-link"
+          routerLink="/admin"
+          routerLinkActive="active"
+        >
+          <span class="nav-icon">🛡️</span>
+          Admin
+        </a>
+      }
+
+    </div>
+
+    <!-- Right side -->
+    <div class="nav-right">
+
+      <!-- Token usage mini bar -->
+      <div
+        class="token-widget"
+        title="Daily token usage: {{ tokenPercent() }}%"
+      >
+        <div class="token-widget-top">
+          <span class="token-label">Tokens</span>
+          <span class="token-pct"
+                [style.color]="getTokenBarColor()">
+            {{ tokenPercent() }}%
           </span>
-
-          <!-- User dropdown -->
-          <div class="dropdown">
-            <button
-              class="btn btn-light btn-sm d-flex align-items-center gap-2
-                     border rounded-pill px-3"
-              type="button"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-            >
-              <i class="bi bi-person-circle"></i>
-              <span class="small fw-medium">
-                {{ authService.currentUser()?.name }}
-              </span>
-              <i class="bi bi-chevron-down" style="font-size: 0.65rem;"></i>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-1">
-              <li>
-                <span class="dropdown-item-text small text-muted">
-                  {{ authService.currentUser()?.email }}
-                </span>
-              </li>
-              <li>
-                <span class="dropdown-item-text small">
-                  <span class="badge bg-primary-subtle text-primary">
-                    {{ authService.currentUser()?.role }}
-                  </span>
-                </span>
-              </li>
-              <li><hr class="dropdown-divider"></li>
-              <li>
-                <button
-                  class="dropdown-item text-danger small"
-                  (click)="logout()"
-                >
-                  <i class="bi bi-box-arrow-right me-2"></i>Sign out
-                </button>
-              </li>
-            </ul>
-          </div>
-
+        </div>
+        <div class="token-mini-bar">
+          <div
+            class="token-mini-fill"
+            [style.width.%]="tokenPercent()"
+            [style.background]="getTokenBarColor()"
+          ></div>
         </div>
       </div>
+
+      <!-- User dropdown -->
+      <div class="user-dropdown-wrap">
+        <button
+          class="user-btn"
+          (click)="toggleMobileMenu()"
+        >
+          <div class="user-avatar">
+            {{ user()?.name?.charAt(0)?.toUpperCase() }}
+          </div>
+          <div class="user-info">
+            <span class="user-name">{{ user()?.name }}</span>
+            <span class="user-role">{{ user()?.role }}</span>
+          </div>
+          <span class="chevron"
+                [class.open]="mobileMenuOpen()">
+            ▾
+          </span>
+        </button>
+
+        <!-- Dropdown menu -->
+        @if (mobileMenuOpen()) {
+          <div class="dropdown-menu">
+            <div class="dropdown-header">
+              <p class="dh-name">{{ user()?.name }}</p>
+              <p class="dh-email">{{ user()?.email }}</p>
+            </div>
+            <div class="dropdown-divider"></div>
+
+            <a
+              class="dropdown-item"
+              routerLink="/dashboard"
+              (click)="mobileMenuOpen.set(false)"
+            >
+              ⚡ Dashboard
+            </a>
+            <a
+              class="dropdown-item"
+              routerLink="/conversations"
+              (click)="mobileMenuOpen.set(false)"
+            >
+              🕐 Conversation History
+            </a>
+
+            <div class="dropdown-divider"></div>
+
+            <div class="dropdown-token-section">
+              <div class="dts-row">
+                <span class="dts-label">Today's usage</span>
+                <span class="dts-val">{{ tokenPercent() }}%</span>
+              </div>
+              <div class="dts-bar">
+                <div
+                  class="dts-fill"
+                  [style.width.%]="tokenPercent()"
+                  [style.background]="getTokenBarColor()"
+                ></div>
+              </div>
+              <div class="dts-row">
+                <span class="dts-label">
+                  {{ formatTokens(user()?.tokensUsedToday || 0) }}
+                  /
+                  {{ formatTokens(user()?.dailyTokenLimit || 0) }}
+                  tokens
+                </span>
+              </div>
+            </div>
+
+            <div class="dropdown-divider"></div>
+
+            <button
+              class="dropdown-item danger"
+              (click)="logout(); mobileMenuOpen.set(false)"
+            >
+              🚪 Sign Out
+            </button>
+
+          </div>
+        }
+      </div>
+
     </div>
+
+    <!-- Mobile hamburger -->
+    <button
+      class="mobile-hamburger"
+      (click)="toggleMobileMenu()"
+    >
+      <span [class.open]="mobileMenuOpen()">☰</span>
+    </button>
+
   </nav>
+
+  <!-- Mobile nav drawer -->
+  @if (mobileMenuOpen()) {
+    <div
+      class="mobile-backdrop"
+      (click)="mobileMenuOpen.set(false)"
+    ></div>
+    <div class="mobile-drawer">
+      <div class="mobile-drawer-header">
+        <div class="user-avatar large">
+          {{ user()?.name?.charAt(0)?.toUpperCase() }}
+        </div>
+        <div>
+          <p class="md-name">{{ user()?.name }}</p>
+          <p class="md-email">{{ user()?.email }}</p>
+        </div>
+      </div>
+      <div class="mobile-drawer-links">
+        <a class="mobile-nav-link"
+           routerLink="/dashboard"
+           routerLinkActive="active"
+           (click)="mobileMenuOpen.set(false)">
+          ⚡ Dashboard
+        </a>
+        <a class="mobile-nav-link"
+           routerLink="/chat"
+           routerLinkActive="active"
+           (click)="mobileMenuOpen.set(false)">
+          💬 Chat
+        </a>
+        <a class="mobile-nav-link"
+           routerLink="/documents"
+           routerLinkActive="active"
+           (click)="mobileMenuOpen.set(false)">
+          📁 Documents
+        </a>
+        <a class="mobile-nav-link"
+           routerLink="/rag"
+           routerLinkActive="active"
+           (click)="mobileMenuOpen.set(false)">
+          🔍 Search
+        </a>
+        <a class="mobile-nav-link"
+           routerLink="/conversations"
+           routerLinkActive="active"
+           (click)="mobileMenuOpen.set(false)">
+          🕐 History
+        </a>
+        @if (isAdmin()) {
+          <a class="mobile-nav-link admin-link"
+             routerLink="/admin"
+             routerLinkActive="active"
+             (click)="mobileMenuOpen.set(false)">
+            🛡️ Admin
+          </a>
+        }
+      </div>
+      <button
+        class="mobile-logout"
+        (click)="logout()"
+      >
+        🚪 Sign Out
+      </button>
+    </div>
+  }
 }
 
 <!-- Page content -->
-<router-outlet />
+<div [class.has-navbar]="isLoggedIn() && !isAuthPage()">
+  <router-outlet></router-outlet>
+</div>

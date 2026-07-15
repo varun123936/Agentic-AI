@@ -3,14 +3,11 @@ import { authGuard } from './core/guards/auth.guard';
 import { adminGuard } from './core/guards/admin.guard';
 
 export const routes: Routes = [
-  // Default redirect
   {
     path: '',
     redirectTo: '/dashboard',
     pathMatch: 'full'
   },
-
-  // Public routes — no guard
   {
     path: 'login',
     loadComponent: () =>
@@ -23,8 +20,6 @@ export const routes: Routes = [
       import('./features/auth/register/register.component')
         .then(m => m.RegisterComponent)
   },
-
-  // Protected routes — authGuard required
   {
     path: 'dashboard',
     canActivate: [authGuard],
@@ -54,14 +49,12 @@ export const routes: Routes = [
         .then(m => m.RagComponent)
   },
   {
-  path: 'conversations',
-  canActivate: [authGuard],
-  loadComponent: () =>
-    import('./features/conversations/conversations.component')
-      .then(m => m.ConversationsComponent)
+    path: 'conversations',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/conversations/conversations.component')
+        .then(m => m.ConversationsComponent)
   },
-
-  // Admin only routes — both guards required
   {
     path: 'admin',
     canActivate: [authGuard, adminGuard],
@@ -69,12 +62,16 @@ export const routes: Routes = [
       import('./features/admin/admin.component')
         .then(m => m.AdminComponent)
   },
-
-  // 404
+  {
+    path: 'error',
+    loadComponent: () =>
+      import('./features/error/error.component')
+        .then(m => m.ErrorComponent)
+  },
   {
     path: '**',
     loadComponent: () =>
-      import('./features/not-found/not-found/not-found.component')
+      import('./features/not-found/not-found.component')
         .then(m => m.NotFoundComponent)
   }
 ];

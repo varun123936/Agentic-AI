@@ -1,0 +1,79 @@
+<div class="not-found-page">
+
+  <div class="not-found-card">
+
+    <!-- Animated 404 -->
+    <div class="error-number">
+      <span class="digit">4</span>
+      <div class="zero-wrap">
+        <div class="zero-face">
+          <div class="eye left-eye"></div>
+          <div class="eye right-eye"></div>
+          <div class="mouth"></div>
+        </div>
+      </div>
+      <span class="digit">4</span>
+    </div>
+
+    <h1 class="nf-title">Page Not Found</h1>
+    <p class="nf-subtitle">
+      Oops! The page you're looking for doesn't exist
+      or has been moved.
+    </p>
+
+    <!-- Countdown bar -->
+    <div class="countdown-section">
+      <p class="countdown-text">
+        Redirecting in
+        <span class="countdown-num">{{ countdown() }}</span>
+        seconds...
+      </p>
+      <div class="countdown-bar">
+        <div
+          class="countdown-progress"
+          [style.width.%]="countdown() * 10"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="nf-actions">
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="goHome()"
+      >
+        <mat-icon>home</mat-icon>
+        Go Home Now
+      </button>
+      <button
+        mat-stroked-button
+        onclick="history.back()"
+      >
+        <mat-icon>arrow_back</mat-icon>
+        Go Back
+      </button>
+    </div>
+
+    <!-- Quick links -->
+    <div class="quick-links">
+      <p class="ql-label">Or jump to:</p>
+      <div class="ql-chips">
+        <a routerLink="/dashboard" class="ql-chip">
+          <mat-icon>dashboard</mat-icon> Dashboard
+        </a>
+        <a routerLink="/chat" class="ql-chip">
+          <mat-icon>chat</mat-icon> Chat
+        </a>
+        <a routerLink="/documents" class="ql-chip">
+          <mat-icon>description</mat-icon> Documents
+        </a>
+        <a routerLink="/rag" class="ql-chip">
+          <mat-icon>search</mat-icon> Search
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+</div>

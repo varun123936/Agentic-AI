@@ -1,0 +1,198 @@
+/* ── Page ────────────────────────────────────────────────────── */
+.not-found-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    135deg, #f0f4ff 0%, #faf5ff 100%
+  );
+  padding: 24px;
+}
+
+/* ── Card ────────────────────────────────────────────────────── */
+.not-found-card {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 8px 40px rgba(26, 86, 219, 0.12);
+  padding: 48px 40px;
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+}
+
+/* ── 404 number ──────────────────────────────────────────────── */
+.error-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.digit {
+  font-size: 7rem;
+  font-weight: 900;
+  color: #1a56db;
+  line-height: 1;
+  letter-spacing: -4px;
+}
+
+/* Animated 0 with sad face */
+.zero-wrap {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1a56db, #7c3aed);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: wobble 2s infinite ease-in-out;
+  flex-shrink: 0;
+}
+
+.zero-face {
+  position: relative;
+  width: 60px;
+  height: 60px;
+}
+
+.eye {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  border-radius: 50%;
+  top: 16px;
+  animation: blink 3s infinite;
+}
+
+.left-eye  { left: 10px; }
+.right-eye { right: 10px; }
+
+.mouth {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 10px;
+  border: 3px solid #ffffff;
+  border-radius: 0 0 14px 14px;
+  border-top: none;
+  transform: translateX(-50%) scaleY(-1);
+}
+
+@keyframes wobble {
+  0%, 100% { transform: rotate(-3deg); }
+  50%       { transform: rotate(3deg); }
+}
+
+@keyframes blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95%            { transform: scaleY(0.1); }
+}
+
+/* ── Text ────────────────────────────────────────────────────── */
+.nf-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 10px 0;
+}
+
+.nf-subtitle {
+  font-size: 0.92rem;
+  color: #6b7280;
+  margin: 0 0 28px 0;
+  line-height: 1.55;
+}
+
+/* ── Countdown ───────────────────────────────────────────────── */
+.countdown-section {
+  margin-bottom: 28px;
+}
+
+.countdown-text {
+  font-size: 0.82rem;
+  color: #9ca3af;
+  margin: 0 0 8px 0;
+}
+
+.countdown-num {
+  font-weight: 700;
+  color: #1a56db;
+  font-size: 1rem;
+}
+
+.countdown-bar {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.countdown-progress {
+  height: 100%;
+  background: linear-gradient(90deg, #1a56db, #7c3aed);
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+/* ── Actions ─────────────────────────────────────────────────── */
+.nf-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.nf-actions button mat-icon {
+  font-size: 18px;
+  height: 18px;
+  width: 18px;
+  margin-right: 4px;
+}
+
+/* ── Quick links ─────────────────────────────────────────────── */
+.ql-label {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  margin: 0 0 10px 0;
+  font-weight: 500;
+}
+
+.ql-chips {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.ql-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.ql-chip:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1a56db;
+}
+
+.ql-chip mat-icon {
+  font-size: 14px;
+  height: 14px;
+  width: 14px;
+}
