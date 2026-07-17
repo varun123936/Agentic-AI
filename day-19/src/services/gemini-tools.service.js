@@ -1,7 +1,3 @@
-// Gemini Tool Calling Service
-// Handles the multi-step conversation with Gemini
-// when tools are involved
-
 import fetch from 'node-fetch';
 import {
   buildGeminiFunctionDeclarations
@@ -22,103 +18,135 @@ Guidelines:
 - Never make up order statuses or product information
 - Always confirm actions like cancellations before stating they are done`;
 
-// ── Single non-streaming call with tool support ────────────────
-export async function callGeminiWithTools(
-  userMessage,
-  conversationHistory = [],
-  maxToolRounds = 5   // prevent infinite tool call loops
-) {
+// ── Helper: read SSE stream reliably ─────────────────────────
+// Uses event-based reading instead of for-await
+// This fixes ECONNRESET with node-fetch v3 in Node.js
+function readSSEStream(responseBody, onChunk, signal) {
+  return new Promise((resolve, reject) => {
+
+    // If already aborted
+    if (signal?.aborted) {
+      responseBody.destroy();
+      return resolve();
+    }
+
+    // Handle abort signal
+    const onAbort = () => {
+      responseBody.destroy();
+      resolve();
+    };
+    signal?.addEventListener('abort', onAbort);
+
+    let buffer = '';
+
+    responseBody.on('data', (rawChunk) => {
+      buffer += rawChunk.toString();
+      const lines = buffer.split('\n');
+
+      // Keep last incomplete line in buffer
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const jsonStr = line.replace('data: ', '').trim();
+        if (!jsonStr || jsonStr === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          onChunk(parsed);
+        } catch {
+          // Skip malformed JSON chunks — normal during streaming
+        }
+      }
+    });
+
+    responseBody.on('end', () => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    });
+
+    responseBody.on('error', (err) => {
+      signal?.removeEventListener('abort', onAbort);
+      if (err.name === 'AbortError' || signal?.aborted) {
+        resolve(); // clean abort — not an error
+      } else {
+        reject(err);
+      }
+    });
+  });
+}
+
+// ── Non-streaming call to Gemini ──────────────────────────────
+async function callGeminiRaw(contents, toolConfig, temperature = 0.2) {
   const apiKey = process.env.GEMINI_API_KEY;
   const url = `${BASE_URL}/${MODEL}:generateContent?key=${apiKey}`;
 
-  // Build contents from history + new message
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents,
+      ...toolConfig,
+      generationConfig: { temperature, maxOutputTokens: 1000 }
+    })
+  });
+
+  const data = await response.json();
+
+  if (data.error) {
+    throw new Error(`Gemini API error: ${data.error.message}`);
+  }
+
+  return data;
+}
+
+// ── Full non-streaming call with tool support ─────────────────
+export async function callGeminiWithTools(
+  userMessage,
+  conversationHistory = [],
+  maxToolRounds = 5
+) {
+  const toolConfig = buildGeminiFunctionDeclarations();
+
   const contents = [
     ...conversationHistory,
-    {
-      role: 'user',
-      parts: [{ text: userMessage }]
-    }
+    { role: 'user', parts: [{ text: userMessage }] }
   ];
-
-  // Get function declarations in Gemini format
-  const toolConfig = buildGeminiFunctionDeclarations();
 
   let toolCallCount = 0;
 
-  // ── Agentic loop — keeps running until AI gives text response ──
   while (toolCallCount < maxToolRounds) {
-
-    const requestBody = {
-      system_instruction: {
-        parts: [{ text: SYSTEM_PROMPT }]
-      },
-      contents,
-      ...toolConfig,    // includes function declarations
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 1000
-      }
-    };
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
-    });
-
-    const data = await response.json();
-
-    if (data.error) {
-      throw new Error(`Gemini API error: ${data.error.message}`);
-    }
-
+    const data = await callGeminiRaw(contents, toolConfig);
     const candidate = data.candidates?.[0];
-    if (!candidate) {
-      throw new Error('No response from Gemini');
-    }
+
+    if (!candidate) throw new Error('No response from Gemini');
 
     const parts = candidate.content?.parts || [];
-
-    // ── Check if Gemini wants to call a tool ───────────────────
     const functionCallPart = parts.find(p => p.functionCall);
+    const textPart = parts.find(p => p.text);
 
     if (functionCallPart) {
-      // AI wants to call a tool
       const { name, args } = functionCallPart.functionCall;
       toolCallCount++;
 
-      console.log(`[GEMINI] Tool call requested: ${name} (round ${toolCallCount})`);
+      console.log(`[GEMINI] Tool call: ${name} (round ${toolCallCount})`);
 
-      // Execute the tool
       const toolResult = await executeTool(name, args);
 
-      // Add AI's tool call to conversation
       contents.push({
         role: 'model',
         parts: [{ functionCall: { name, args } }]
       });
-
-      // Add tool result to conversation
-      // Gemini needs this to continue
       contents.push({
         role: 'user',
-        parts: [{
-          functionResponse: {
-            name,
-            response: toolResult
-          }
-        }]
+        parts: [{ functionResponse: { name, response: toolResult } }]
       });
 
-      // Continue loop — Gemini will either call another tool
-      // or give a final text response
       continue;
     }
 
-    // ── No tool call — AI gave a final text response ───────────
-    const textPart = parts.find(p => p.text);
     if (textPart) {
-      // Add final AI response to conversation
       contents.push({
         role: 'model',
         parts: [{ text: textPart.text }]
@@ -132,35 +160,33 @@ export async function callGeminiWithTools(
       };
     }
 
-    // Unexpected response
     throw new Error('Gemini returned neither tool call nor text');
   }
 
-  // Max rounds hit — return what we have
   return {
-    answer: 'I was unable to complete the request after multiple attempts. Please try again.',
+    answer: 'Unable to complete after maximum tool rounds.',
     toolCallCount,
     conversationHistory: contents,
     usage: null
   };
 }
 
-// ── Streaming version with tool support ────────────────────────
-// Tools run first (non-streaming), then final answer streams
+// ── Streaming call with tool support ─────────────────────────
+// Phase 1: Run tool calls (non-streaming — must complete first)
+// Phase 2: Stream the final text answer
 export async function streamGeminiWithTools(
   userMessage,
   conversationHistory = [],
-  onStatus,      // called when tool is executing
-  onChunk,       // called for each text chunk
-  onDone,        // called when complete
-  onError,       // called on error
-  signal         // AbortController signal
+  onStatus,
+  onChunk,
+  onDone,
+  onError,
+  signal
 ) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   try {
-    // Phase 1: Run tool calls (non-streaming)
-    // We must get tool results before we can stream the final answer
+    // ── PHASE 1: Tool calls (non-streaming) ───────────────────
     const toolConfig = buildGeminiFunctionDeclarations();
 
     const contents = [
@@ -171,26 +197,10 @@ export async function streamGeminiWithTools(
     let toolCallCount = 0;
     const MAX_TOOL_ROUNDS = 5;
 
-    // Run tool rounds until AI is ready to give final answer
     while (toolCallCount < MAX_TOOL_ROUNDS) {
       if (signal?.aborted) return;
 
-      const url = `${BASE_URL}/${MODEL}:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents,
-          ...toolConfig,
-          generationConfig: { temperature: 0.2, maxOutputTokens: 1000 }
-        }),
-        signal
-      });
-
-      const data = await response.json();
-      if (data.error) throw new Error(data.error.message);
-
+      const data = await callGeminiRaw(contents, toolConfig, 0.2);
       const parts = data.candidates?.[0]?.content?.parts || [];
       const functionCallPart = parts.find(p => p.functionCall);
 
@@ -198,8 +208,8 @@ export async function streamGeminiWithTools(
         const { name, args } = functionCallPart.functionCall;
         toolCallCount++;
 
-        // Tell the frontend which tool is running
-        onStatus?.(`Using tool: ${name.replace(/_/g, ' ')}...`);
+        onStatus?.(`Using ${name.replace(/_/g, ' ')}...`);
+        console.log(`[STREAM] Tool call: ${name}`);
 
         const toolResult = await executeTool(name, args);
 
@@ -215,15 +225,17 @@ export async function streamGeminiWithTools(
         continue;
       }
 
-      // No more tool calls — ready to stream final answer
+      // No more tool calls — ready to stream
       break;
     }
 
-    // Phase 2: Stream the final answer
     if (signal?.aborted) return;
+
+    // ── PHASE 2: Stream the final answer ─────────────────────
     onStatus?.('Generating answer...');
 
     const streamUrl = `${BASE_URL}/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
+
     const streamResponse = await fetch(streamUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -235,38 +247,42 @@ export async function streamGeminiWithTools(
       signal
     });
 
+    if (!streamResponse.ok) {
+      const errData = await streamResponse.json();
+      throw new Error(errData.error?.message || `HTTP ${streamResponse.status}`);
+    }
+
     let inputTokens = 0;
     let outputTokens = 0;
 
-    for await (const chunk of streamResponse.body) {
-      if (signal?.aborted) break;
+    // ── Use event-based reading (fixes ECONNRESET) ────────────
+    await readSSEStream(
+      streamResponse.body,
+      (parsed) => {
+        const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) onChunk(text);
 
-      const lines = chunk.toString().split('\n');
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const jsonStr = line.replace('data: ', '').trim();
-        if (!jsonStr) continue;
+        if (parsed.usageMetadata) {
+          inputTokens = parsed.usageMetadata.promptTokenCount || 0;
+          outputTokens = parsed.usageMetadata.candidatesTokenCount || 0;
+        }
+      },
+      signal
+    );
 
-        try {
-          const parsed = JSON.parse(jsonStr);
-          const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) onChunk(text);
-
-          if (parsed.usageMetadata) {
-            inputTokens = parsed.usageMetadata.promptTokenCount || 0;
-            outputTokens = parsed.usageMetadata.candidatesTokenCount || 0;
-          }
-        } catch { /* skip partial */ }
-      }
+    if (!signal?.aborted) {
+      onDone({
+        toolCallCount,
+        tokens: { input: inputTokens, output: outputTokens }
+      });
     }
 
-    onDone({
-      toolCallCount,
-      tokens: { input: inputTokens, output: outputTokens }
-    });
-
   } catch (error) {
-    if (error.name === 'AbortError') return;
+    if (error.name === 'AbortError' || signal?.aborted) {
+      console.log('[STREAM] Aborted cleanly');
+      return;
+    }
+    console.error('[STREAM ERROR]', error.message);
     onError(error.message);
   }
 }
