@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Agent Dashboard — Day 19</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+  :root {
+    --brand: #1a56db; --brand-dark: #1e40af;
+    --success: #16a34a; --danger: #dc2626; --warn: #d97706;
+    --bg: #f4f6f9; --card-shadow: 0 2px 12px rgba(0,0,0,.07);
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); font-family: 'Segoe UI', sans-serif; }
+
+  /* ── Navbar ── */
+  .app-nav { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 10px 24px; display:flex; align-items:center; gap:16px; position:sticky; top:0; z-index:100; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:1.05rem; color:#111; text-decoration:none; }
+  .brand-dot { width:32px; height:32px; background:linear-gradient(135deg,#1a56db,#7c3aed); border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:.65rem; font-weight:800; }
+  .provider-toggle { display:flex; gap:6px; margin-left:auto; }
+  .prov-btn { border:1px solid #e5e7eb; background:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px; transition:all .15s; }
+  .prov-btn:hover { border-color:#93c5fd; background:#f0f4ff; }
+  .prov-btn.active { background:var(--brand); color:#fff; border-color:var(--brand); }
+  .model-badge { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; border-radius:20px; padding:3px 10px; font-size:.72rem; font-weight:600; }
+
+  /* ── Layout ── */
+  .main { padding:20px 20px 40px; max-width:1400px; margin:0 auto; }
+  .page-grid { display:grid; grid-template-columns:1fr 320px; gap:20px; }
+  @media(max-width:1100px){ .page-grid { grid-template-columns:1fr; } }
+
+  /* ── Tabs ── */
+  .tab-header { display:flex; gap:0; border-bottom:1px solid #e5e7eb; margin-bottom:20px; }
+  .tab-btn { border:none; background:none; padding:12px 20px; font-size:.88rem; font-weight:500; color:#6b7280; cursor:pointer; border-bottom:2px solid transparent; display:flex; align-items:center; gap:6px; transition:all .15s; }
+  .tab-btn:hover { color:var(--brand); background:#f8faff; }
+  .tab-btn.active { color:var(--brand); border-bottom-color:var(--brand); font-weight:600; }
+  .tab-btn i { font-size:1rem; }
+  .tab-pane { display:none; }
+  .tab-pane.active { display:block; }
+
+  /* ── Card ── */
+  .card { background:#fff; border:none; border-radius:12px; box-shadow:var(--card-shadow); }
+  .section-title { font-size:.88rem; font-weight:700; color:#374151; display:flex; align-items:center; gap:6px; margin-bottom:12px; }
+
+  /* ── Messages ── */
+  .msg-area { height:400px; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; background:#fafbff; border-radius:10px; border:1px solid #e5e7eb; scroll-behavior:smooth; }
+  .msg-area::-webkit-scrollbar { width:4px; }
+  .msg-area::-webkit-scrollbar-thumb { background:#e5e7eb; border-radius:4px; }
+  .msg-user { align-self:flex-end; background:var(--brand); color:#fff; padding:10px 14px; border-radius:12px 12px 4px 12px; max-width:75%; font-size:.88rem; line-height:1.5; }
+  .msg-ai { align-self:flex-start; background:#fff; border:1px solid #e5e7eb; padding:10px 14px; border-radius:12px 12px 12px 4px; max-width:80%; font-size:.88rem; line-height:1.6; box-shadow:0 1px 4px rgba(0,0,0,.04); white-space:pre-wrap; }
+  .msg-status { align-self:center; background:#fffbeb; border:1px solid #fde68a; color:#92400e; padding:5px 14px; border-radius:20px; font-size:.75rem; display:flex; align-items:center; gap:6px; }
+  .msg-error { align-self:center; background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:8px 14px; border-radius:8px; font-size:.8rem; }
+  .cursor-blink { display:inline-block; color:var(--brand); animation:blink .8s step-end infinite; font-weight:300; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── Input area ── */
+  .input-row { display:flex; gap:8px; margin-top:10px; }
+  .input-row textarea { flex:1; border:1px solid #e5e7eb; border-radius:8px; padding:10px 14px; font-size:.88rem; resize:none; height:48px; transition:border-color .15s; font-family:inherit; }
+  .input-row textarea:focus { outline:none; border-color:var(--brand); }
+  .send-btn { background:var(--brand); color:#fff; border:none; border-radius:8px; padding:0 18px; cursor:pointer; font-size:.9rem; transition:background .15s; display:flex; align-items:center; gap:6px; }
+  .send-btn:hover { background:var(--brand-dark); }
+  .send-btn:disabled { background:#9ca3af; cursor:not-allowed; }
+
+  /* ── Tool log ── */
+  .tool-log { display:flex; flex-direction:column; gap:6px; max-height:250px; overflow-y:auto; }
+  .tool-item { background:#f8faff; border:1px solid #e0e7ff; border-radius:8px; padding:8px 12px; display:flex; align-items:center; gap:8px; font-size:.78rem; }
+  .tool-item.running { background:#fffbeb; border-color:#fde68a; }
+  .tool-item.done    { background:#f0fdf4; border-color:#bbf7d0; }
+  .tool-item.error   { background:#fef2f2; border-color:#fecaca; }
+  .tool-name { font-weight:600; color:#374151; }
+  .tool-spin { animation:spin 1s linear infinite; font-size:.9rem; color:#d97706; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ── Approval box ── */
+  .approval-box { background:linear-gradient(135deg,#fffbeb,#fef3c7); border:2px solid #f59e0b; border-radius:12px; padding:18px; margin-top:12px; }
+  .approval-title { font-weight:700; color:#92400e; font-size:.95rem; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+  .approval-detail { background:#fff; border-radius:8px; padding:10px 12px; font-size:.78rem; color:#374151; margin-bottom:12px; font-family:monospace; max-height:120px; overflow-y:auto; }
+  .approval-btns { display:flex; gap:8px; }
+  .btn-approve { background:#16a34a; color:#fff; border:none; border-radius:8px; padding:8px 20px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; }
+  .btn-deny    { background:#dc2626; color:#fff; border:none; border-radius:8px; padding:8px 20px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; }
+  .btn-approve:hover { background:#15803d; }
+  .btn-deny:hover    { background:#b91c1c; }
+
+  /* ── Sidebar ── */
+  .sidebar { display:flex; flex-direction:column; gap:16px; }
+  .quick-card { padding:14px 16px; }
+  .quick-item { padding:8px 12px; border:1px solid #e5e7eb; border-radius:8px; margin-bottom:6px; cursor:pointer; transition:all .15s; font-size:.82rem; color:#374151; display:flex; align-items:center; gap:8px; background:#fafafa; }
+  .quick-item:hover { border-color:#93c5fd; background:#f0f4ff; color:var(--brand); }
+  .quick-item:last-child { margin-bottom:0; }
+
+  /* ── Stats ── */
+  .stat-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+  .stat-box { background:#f0f4ff; border-radius:8px; padding:10px 12px; text-align:center; }
+  .stat-val { font-size:1.3rem; font-weight:800; color:var(--brand); }
+  .stat-lbl { font-size:.68rem; color:#9ca3af; text-transform:uppercase; letter-spacing:.4px; }
+
+  /* ── Feedback input ── */
+  .feedback-input { width:100%; border:1px solid #e5e7eb; border-radius:6px; padding:6px 10px; font-size:.8rem; margin-bottom:10px; font-family:inherit; }
+
+  /* ── Typing dots ── */
+  .typing { display:flex; gap:4px; align-items:center; padding:4px; }
+  .typing span { width:7px; height:7px; background:#adb5bd; border-radius:50%; animation:bounce 1.2s infinite ease-in-out; }
+  .typing span:nth-child(2) { animation-delay:.2s; }
+  .typing span:nth-child(3) { animation-delay:.4s; }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0);opacity:.4} 30%{transform:translateY(-6px);opacity:1} }
+
+  /* ── Timer ── */
+  .elapsed { font-size:.7rem; color:#9ca3af; }
+  .done-badge { display:inline-flex; align-items:center; gap:4px; background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; border-radius:20px; padding:3px 10px; font-size:.72rem; font-weight:600; }
+</style>
+</head>
+<body>
+
+<!-- ── NAVBAR ───────────────────────────────────────────────── -->
+<nav class="app-nav">
+  <a class="brand" href="/">
+    <div class="brand-dot">AI</div>
+    Agent Dashboard — Day 19
+  </a>
+  <span id="modelBadge" class="model-badge">gemini-2.0-flash</span>
+  <div class="provider-toggle">
+    <button class="prov-btn active" id="btnGemini" onclick="switchProvider('gemini')">
+      <i class="bi bi-stars"></i> Gemini 2.0
+    </button>
+    <button class="prov-btn" id="btnOllama" onclick="switchProvider('ollama')">
+      <i class="bi bi-cpu"></i> Ollama (gemma4)
+    </button>
+  </div>
+</nav>
+
+<!-- ── MAIN ─────────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- Tab header -->
+  <div class="tab-header">
+    <button class="tab-btn active" onclick="showTab('chat')">
+      <i class="bi bi-chat-dots"></i> Chat Agent
+    </button>
+    <button class="tab-btn" onclick="showTab('investigate')">
+      <i class="bi bi-activity"></i> Incident Investigation
+    </button>
+    <button class="tab-btn" onclick="showTab('orders')">
+      <i class="bi bi-bag-check"></i> Order Management
+    </button>
+  </div>
+
+  <!-- ── TAB 1: CHAT AGENT ─────────────────────────────────── -->
+  <div id="tab-chat" class="tab-pane active">
+    <div class="page-grid">
+      <div>
+        <div class="card p-3">
+          <div class="section-title">
+            <i class="bi bi-chat-dots text-primary"></i> AI Chat with Tools
+            <span id="chatStatus" class="elapsed ms-auto"></span>
+          </div>
+          <div id="chatMsgs" class="msg-area">
+            <div class="msg-ai">👋 Hello! I can help you check order status, search products, get weather, and more. Ask me anything!</div>
+          </div>
+          <div class="input-row mt-2">
+            <textarea id="chatInput" placeholder="e.g. What is the status of order ORD-1001?" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+            <button class="send-btn" id="chatBtn" onclick="sendChat()"><i class="bi bi-send-fill"></i></button>
+          </div>
+          <div class="mt-2 d-flex gap-2 flex-wrap" style="font-size:.72rem;color:#9ca3af;">
+            <kbd>Enter</kbd> send &nbsp;·&nbsp; <kbd>Shift+Enter</kbd> new line
+          </div>
+        </div>
+        <!-- Tool log -->
+        <div class="card p-3 mt-3">
+          <div class="section-title"><i class="bi bi-wrench text-warning"></i> Tool Execution Log</div>
+          <div id="chatToolLog" class="tool-log">
+            <div style="color:#9ca3af;font-size:.78rem;text-align:center;padding:12px">Tool calls will appear here...</div>
+          </div>
+        </div>
+      </div>
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="card quick-card">
+          <div class="section-title"><i class="bi bi-lightning text-warning"></i> Quick Queries</div>
+          <div class="quick-item" onclick="setInput('chat','What is the status of order ORD-1001?')"><i class="bi bi-box-seam text-primary"></i> Order ORD-1001 status</div>
+          <div class="quick-item" onclick="setInput('chat','Show all orders for ravi@example.com')"><i class="bi bi-list-ul text-primary"></i> My order history</div>
+          <div class="quick-item" onclick="setInput('chat','Search for Apple laptops')"><i class="bi bi-search text-primary"></i> Search Apple laptops</div>
+          <div class="quick-item" onclick="setInput('chat','What is the weather in Hyderabad today?')"><i class="bi bi-cloud-sun text-warning"></i> Weather in Hyderabad</div>
+          <div class="quick-item" onclick="setInput('chat','Check stock for PROD-002')"><i class="bi bi-box text-success"></i> Check product stock</div>
+          <div class="quick-item" onclick="setInput('chat','Check weather in Mumbai and find Sony headphones')"><i class="bi bi-shuffle text-purple-600"></i> Multi-tool query</div>
+        </div>
+        <div class="card quick-card">
+          <div class="section-title"><i class="bi bi-info-circle text-primary"></i> Available Tools</div>
+          <div id="toolList" style="font-size:.75rem;color:#6b7280;line-height:2;">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB 2: INCIDENT INVESTIGATION ─────────────────────── -->
+  <div id="tab-investigate" class="tab-pane">
+    <div class="page-grid">
+      <div>
+        <div class="card p-3">
+          <div class="section-title">
+            <i class="bi bi-activity text-danger"></i> DevOps Incident Investigation
+            <span id="incStatus" class="elapsed ms-auto"></span>
+          </div>
+          <div id="incMsgs" class="msg-area">
+            <div class="msg-ai">🔍 I can investigate service outages, check logs, diagnose issues, and restart services (with your approval). Describe the incident!</div>
+          </div>
+
+          <!-- Approval box (hidden by default) -->
+          <div id="incApproval" class="approval-box" style="display:none">
+            <div class="approval-title"><i class="bi bi-shield-exclamation"></i> Action Requires Your Approval</div>
+            <div id="incApprovalMsg" class="approval-detail"></div>
+            <input type="text" class="feedback-input" id="incFeedback" placeholder="Optional: reason or feedback for audit log...">
+            <div class="approval-btns">
+              <button class="btn-approve" onclick="sendApproval('inc', true)"><i class="bi bi-check-lg"></i> Approve</button>
+              <button class="btn-deny"    onclick="sendApproval('inc', false)"><i class="bi bi-x-lg"></i> Deny</button>
+            </div>
+          </div>
+
+          <div class="input-row mt-2">
+            <textarea id="incInput" placeholder="e.g. Check all services and investigate any issues" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendInvestigate()}"></textarea>
+            <button class="send-btn" id="incBtn" onclick="sendInvestigate()"><i class="bi bi-search"></i></button>
+          </div>
+        </div>
+        <!-- Tool log -->
+        <div class="card p-3 mt-3">
+          <div class="section-title"><i class="bi bi-terminal text-success"></i> Agent Execution Log</div>
+          <div id="incToolLog" class="tool-log">
+            <div style="color:#9ca3af;font-size:.78rem;text-align:center;padding:12px">Agent steps will appear here...</div>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar">
+        <div class="card quick-card">
+          <div class="section-title"><i class="bi bi-lightning text-warning"></i> Quick Scenarios</div>
+          <div class="quick-item" onclick="setInput('inc','Check all services and investigate any issues')"><i class="bi bi-globe text-primary"></i> Full system check</div>
+          <div class="quick-item" onclick="setInput('inc','The payment service seems down. Investigate and fix it.')"><i class="bi bi-credit-card text-danger"></i> Payment service down</div>
+          <div class="quick-item" onclick="setInput('inc','Notification service is not sending emails. Check logs.')"><i class="bi bi-bell text-warning"></i> Notification issue</div>
+          <div class="quick-item" onclick="setInput('inc','Check health of order-service')"><i class="bi bi-heart-pulse text-success"></i> Check order service</div>
+        </div>
+        <div class="card quick-card">
+          <div class="section-title"><i class="bi bi-diagram-3 text-primary"></i> Approval Flow</div>
+          <div style="font-size:.78rem;color:#6b7280;line-height:1.7">
+            <p>The agent will <strong>automatically stop</strong> and ask for approval before:</p>
+            <ul class="ps-3">
+              <li>Restarting a service</li>
+              <li>Scaling instances</li>
+            </ul>
+            <p>You'll see an approval dialog with full details before anything is executed.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB 3: ORDER MANAGEMENT ───────────────────────────── -->
+  <div id="tab-orders" class="tab-pane">
+    <div class="page-grid">
+      <div>
+        <div class="card p-3">
+          <div class="section-title">
+            <i class="bi bi-bag-check text-success"></i> Order Management Agent
+            <span id="ordStatus" class="elapsed ms-auto"></span>
+          </div>
+          <div id="ordMsgs" class="msg-area">
+            <div class="msg-ai">📦 I can check orders, look up products, and process cancellations (with your approval). How can I help?</div>
+          </div>
+
+          <!-- Approval box -->
+          <div id="ordApproval" class="approval-box" style="display:none">
+            <div class="approval-title"><i class="bi bi-exclamation-triangle"></i> Confirm Order Action</div>
+            <div id="ordApprovalMsg" class="approval-detail"></div>
+            <input type="text" class="feedback-input" id="ordFeedback" placeholder="Optional: reason for audit log...">
+            <div class="approval-btns">
+              <button class="btn-approve" onclick="sendApproval('ord', true)"><i class="bi bi-check-lg"></i> Confirm</button>
+              <button class="btn-deny"    onclick="sendApproval('ord', false)"><i class="bi bi-x-lg"></i> Cancel</button>
+            </div>
+          </div>
+
+          <div class="input-row mt-2">
+            <textarea id="ordInput" placeholder="e.g. Cancel my order ORD-1002, I changed my mind" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendOrder()}"></textarea>
+            <button class="send-btn" id="ordBtn" onclick="sendOrder()"><i class="bi bi-send-fill"></i></button>
+          </div>
+        </div>
+        <div class="card p-3 mt-3">
+          <div class="section-title"><i class="bi bi-wrench text-warning"></i> Tool Execution Log</div>
+          <div id="ordToolLog" class="tool-log">
+            <div style="color:#9ca3af;font-size:.78rem;text-align:center;padding:12px">Tool calls appear here...</div>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar">
+        <div class="card quick-card">
+          <div class="section-title"><i class="bi bi-lightning text-warning"></i> Quick Orders</div>
+          <div class="quick-item" onclick="setInput('ord','What is the status of order ORD-1001?')"><i class="bi bi-search text-primary"></i> Check ORD-1001</div>
+          <div class="quick-item" onclick="setInput('ord','Show all orders for ravi@example.com')"><i class="bi bi-list-ul text-primary"></i> All orders for Ravi</div>
+          <div class="quick-item" onclick="setInput('ord','Cancel my order ORD-1002, I changed my mind')"><i class="bi bi-x-circle text-danger"></i> Cancel ORD-1002</div>
+          <div class="quick-item" onclick="setInput('ord','Search for iPhone products and check if any are in stock')"><i class="bi bi-phone text-success"></i> Search iPhones</div>
+        </div>
+        <div class="card quick-card">
+          <div class="section-title"><i class="bi bi-database text-primary"></i> Seeded Data</div>
+          <div style="font-size:.75rem;color:#6b7280;line-height:2">
+            <strong>Orders:</strong><br>
+            ORD-1001 — Shipped (MacBook)<br>
+            ORD-1002 — Pending (iPhone) ← cancellable<br>
+            ORD-1003 — Delivered (Headphones)<br><br>
+            <strong>Products:</strong><br>
+            PROD-001 MacBook (in stock)<br>
+            PROD-002 iPhone 15 Pro (low stock)<br>
+            PROD-003 Sony WH-1000XM5 (out of stock)
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ── State ─────────────────────────────────────────────────────
+let STATE = {
+  provider: 'gemini',
+  chat:        { busy:false, toolLogEl:null },
+  inc:         { busy:false, sessionId:null, toolLogEl:null },
+  ord:         { busy:false, sessionId:null, toolLogEl:null },
+  elapsedTimers: {}
+};
+
+// ── Tab switching ─────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ── Provider switching ────────────────────────────────────────
+async function switchProvider(p) {
+  try {
+    const r = await fetch('/api/config/provider', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ provider: p })
+    });
+    const d = await r.json();
+    STATE.provider = p;
+    document.getElementById('modelBadge').textContent = d.model;
+    document.getElementById('btnGemini').classList.toggle('active', p==='gemini');
+    document.getElementById('btnOllama').classList.toggle('active', p==='ollama');
+  } catch(e) { alert('Provider switch failed: ' + e.message); }
+}
+
+// ── Quick input setter ────────────────────────────────────────
+function setInput(tab, text) {
+  const map = { chat:'chatInput', inc:'incInput', ord:'ordInput' };
+  document.getElementById(map[tab]).value = text;
+  if (tab !== document.querySelector('.tab-pane.active')?.id?.replace('tab-','')) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => {
+      if (['chat','investigate','orders'][i] === tab ||
+          b.textContent.toLowerCase().includes(tab === 'inc' ? 'incident' : tab === 'ord' ? 'order' : tab)) {
+        b.click();
+      }
+    });
+  }
+}
+
+// ── Elapsed timer ─────────────────────────────────────────────
+function startTimer(elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  let s = 0;
+  clearInterval(STATE.elapsedTimers[elId]);
+  STATE.elapsedTimers[elId] = setInterval(() => {
+    s++;
+    el.textContent = `${s}s elapsed`;
+  }, 1000);
+}
+
+function stopTimer(elId, msg) {
+  clearInterval(STATE.elapsedTimers[elId]);
+  const el = document.getElementById(elId);
+  if (el) el.innerHTML = msg || '';
+}
+
+// ── Message helpers ───────────────────────────────────────────
+function addMsg(areaId, type, content) {
+  const area = document.getElementById(areaId);
+  const el   = document.createElement('div');
+  el.className = type === 'user' ? 'msg-user'
+               : type === 'status' ? 'msg-status'
+               : type === 'error'  ? 'msg-error'
+               : 'msg-ai';
+  if (type === 'status') el.innerHTML = `<span class="tool-spin">⟳</span> ${content}`;
+  else el.textContent = content;
+  area.appendChild(el);
+  area.scrollTop = area.scrollHeight;
+  return el;
+}
+
+function addStreamingMsg(areaId) {
+  const area = document.getElementById(areaId);
+  const el   = document.createElement('div');
+  el.className = 'msg-ai';
+  el.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  area.appendChild(el);
+  area.scrollTop = area.scrollHeight;
+  return el;
+}
+
+// ── Tool log helpers ──────────────────────────────────────────
+function clearToolLog(logId) {
+  const el = document.getElementById(logId);
+  el.innerHTML = '';
+}
+
+function addToolLog(logId, name, status = 'running') {
+  const log = document.getElementById(logId);
+  // Remove the placeholder if present
+  if (log.children.length === 1 && log.children[0].style.color === 'rgb(156, 163, 175)') {
+    log.innerHTML = '';
+  }
+  const el = document.createElement('div');
+  el.id    = `tool-${name}-${Date.now()}`;
+  el.className = `tool-item ${status}`;
+  const icon = status === 'running' ? '<i class="bi bi-arrow-repeat tool-spin"></i>'
+             : status === 'done'    ? '<i class="bi bi-check-circle-fill text-success"></i>'
+             : '<i class="bi bi-x-circle-fill text-danger"></i>';
+  el.innerHTML = `${icon} <span class="tool-name">${name.replace(/_/g,' ')}</span>`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  return el;
+}
+
+function updateToolLog(el, status) {
+  if (!el) return;
+  el.className = `tool-item ${status}`;
+  const icon = el.querySelector('i');
+  if (icon) {
+    if (status === 'done')  icon.className = 'bi bi-check-circle-fill text-success';
+    if (status === 'error') icon.className = 'bi bi-x-circle-fill text-danger';
+  }
+}
+
+// ── SSE reader ────────────────────────────────────────────────
+async function readSSE(response, onEvent) {
+  const reader  = response.body.getReader();
+  const decoder = new TextDecoder();
+  let   buffer  = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const s = line.slice(6).trim();
+      if (!s) continue;
+      try { onEvent(JSON.parse(s)); } catch {}
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// CHAT AGENT
+// ─────────────────────────────────────────────────────────────
+async function sendChat() {
+  if (STATE.chat.busy) return;
+  const input = document.getElementById('chatInput');
+  const msg   = input.value.trim();
+  if (!msg) return;
+
+  STATE.chat.busy = true;
+  input.value = '';
+  document.getElementById('chatBtn').disabled = true;
+
+  clearToolLog('chatToolLog');
+  addMsg('chatMsgs', 'user', msg);
+  const aiEl = addStreamingMsg('chatMsgs');
+  aiEl.innerHTML = '';
+  startTimer('chatStatus');
+
+  let currentToolEl = null;
+  let toolCount     = 0;
+
+  try {
+    const response = await fetch('/api/agent/stream', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ message: msg })
+    });
+
+    if (!response.ok) { throw new Error(`HTTP ${response.status}`); }
+
+    await readSSE(response, evt => {
+      if (evt.type === 'connected') {
+        addMsg('chatMsgs', 'status', `Connected → ${evt.model}`);
+      }
+      else if (evt.type === 'status') {
+        // Update status and add tool log entry
+        const existing = document.querySelector('.msg-status');
+        if (existing) existing.remove();
+        addMsg('chatMsgs', 'status', evt.message);
+        if (evt.message.toLowerCase().includes('using')) {
+          currentToolEl = addToolLog('chatToolLog', evt.message.replace('Using ','').replace('...',''), 'running');
+          toolCount++;
+        }
+      }
+      else if (evt.type === 'tool_call') {
+        if (currentToolEl) updateToolLog(currentToolEl, 'done');
+        currentToolEl = addToolLog('chatToolLog', evt.toolName, 'running');
+        toolCount++;
+      }
+      else if (evt.type === 'chunk') {
+        // Remove typing indicator on first chunk
+        if (aiEl.querySelector('.typing')) aiEl.innerHTML = '';
+        aiEl.textContent += evt.content;
+        aiEl.innerHTML += '<span class="cursor-blink">|</span>';
+        document.getElementById('chatMsgs').scrollTop = 99999;
+      }
+      else if (evt.type === 'done') {
+        // Remove cursor
+        const cursor = aiEl.querySelector('.cursor-blink');
+        if (cursor) cursor.remove();
+        if (currentToolEl) updateToolLog(currentToolEl, 'done');
+        // Remove status messages
+        document.querySelectorAll('#chatMsgs .msg-status').forEach(e => e.remove());
+        stopTimer('chatStatus', `<span class="done-badge"><i class="bi bi-check-circle-fill"></i> ${evt.latencyMs}ms · ${toolCount} tool call${toolCount!==1?'s':''}</span>`);
+      }
+      else if (evt.type === 'error') {
+        aiEl.textContent = `❌ Error: ${evt.message}`;
+        aiEl.style.color = '#dc2626';
+        if (currentToolEl) updateToolLog(currentToolEl, 'error');
+        stopTimer('chatStatus', '<span style="color:#dc2626">Failed</span>');
+      }
+    });
+
+  } catch (err) {
+    aiEl.textContent = `❌ Connection error: ${err.message}`;
+    aiEl.style.color = '#dc2626';
+    stopTimer('chatStatus', '<span style="color:#dc2626">Error</span>');
+  } finally {
+    STATE.chat.busy = false;
+    document.getElementById('chatBtn').disabled = false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// INCIDENT INVESTIGATION
+// ─────────────────────────────────────────────────────────────
+async function sendInvestigate() {
+  if (STATE.inc.busy) return;
+  const input = document.getElementById('incInput');
+  const msg   = input.value.trim();
+  if (!msg) return;
+
+  STATE.inc.busy      = true;
+  STATE.inc.sessionId = null;
+  input.value = '';
+  document.getElementById('incBtn').disabled = true;
+  document.getElementById('incApproval').style.display = 'none';
+
+  clearToolLog('incToolLog');
+  addMsg('incMsgs', 'user', msg);
+  const aiEl = addStreamingMsg('incMsgs');
+  aiEl.innerHTML = '';
+  startTimer('incStatus');
+
+  let currentToolEl = null;
+
+  try {
+    const response = await fetch('/api/incident/investigate', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ message: msg })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    await readSSE(response, evt => handleIncidentEvent(evt, aiEl, () => currentToolEl, el => { currentToolEl = el; }));
+
+  } catch (err) {
+    aiEl.textContent = `❌ Error: ${err.message}`;
+    aiEl.style.color = '#dc2626';
+    stopTimer('incStatus', '<span style="color:#dc2626">Error</span>');
+    STATE.inc.busy = false;
+    document.getElementById('incBtn').disabled = false;
+  }
+}
+
+function handleIncidentEvent(evt, aiEl, getToolEl, setToolEl) {
+  if (evt.type === 'connected') {
+    addMsg('incMsgs','status',`Connected → ${evt.model} | Session: ${evt.sessionId}`);
+    STATE.inc.sessionId = evt.sessionId;
+  }
+  else if (evt.type === 'status') {
+    document.querySelectorAll('#incMsgs .msg-status').forEach(e => e.remove());
+    addMsg('incMsgs','status', evt.message);
+  }
+  else if (evt.type === 'tool_call') {
+    const prev = getToolEl();
+    if (prev) updateToolLog(prev, 'done');
+    const el = addToolLog('incToolLog', evt.toolName, 'running');
+    setToolEl(el);
+  }
+  else if (evt.type === 'approval_required') {
+    STATE.inc.sessionId = evt.sessionId;
+    const prev = getToolEl();
+    if (prev) updateToolLog(prev, 'running');
+    document.querySelectorAll('#incMsgs .msg-status').forEach(e => e.remove());
+    aiEl.textContent = evt.message || 'Approval required to proceed.';
+    document.getElementById('incApprovalMsg').textContent =
+      `Tool: ${evt.toolName}\nArgs: ${JSON.stringify(evt.toolArgs, null, 2)}`;
+    document.getElementById('incApproval').style.display = 'block';
+    stopTimer('incStatus', `<span style="color:#d97706">⏳ Awaiting approval...</span>`);
+    document.getElementById('incMsgs').scrollTop = 99999;
+    // Don't re-enable button — keep busy until approval
+  }
+  else if (evt.type === 'complete') {
+    const prev = getToolEl();
+    if (prev) updateToolLog(prev, 'done');
+    document.querySelectorAll('#incMsgs .msg-status').forEach(e => e.remove());
+    if (aiEl.querySelector('.typing')) aiEl.innerHTML = '';
+    aiEl.textContent = evt.answer;
+    stopTimer('incStatus', `<span class="done-badge"><i class="bi bi-check-circle-fill"></i> ${evt.latencyMs}ms · ${evt.toolCallCount} steps</span>`);
+    STATE.inc.busy = false;
+    document.getElementById('incBtn').disabled = false;
+  }
+  else if (evt.type === 'error') {
+    if (aiEl.querySelector('.typing')) aiEl.innerHTML = '';
+    aiEl.textContent = `❌ ${evt.message}`;
+    aiEl.style.color = '#dc2626';
+    const prev = getToolEl();
+    if (prev) updateToolLog(prev, 'error');
+    stopTimer('incStatus', '<span style="color:#dc2626">Failed</span>');
+    STATE.inc.busy = false;
+    document.getElementById('incBtn').disabled = false;
+  }
+}
+
+async function sendApproval(tab, approved) {
+  const isInc      = tab === 'inc';
+  const sessionId  = isInc ? STATE.inc.sessionId : STATE.ord.sessionId;
+  const feedback   = document.getElementById(`${tab}Feedback`).value.trim();
+  const approvalEl = document.getElementById(`${tab}Approval`);
+
+  if (!sessionId) { alert('No pending session. Please start a new investigation.'); return; }
+
+  approvalEl.style.display = 'none';
+
+  const msgArea = document.getElementById(isInc ? 'incMsgs' : 'ordMsgs');
+  const logId   = isInc ? 'incToolLog' : 'ordToolLog';
+  addMsg(isInc ? 'incMsgs' : 'ordMsgs', 'status', approved ? '✅ Approved. Executing action...' : '❌ Denied. Finding alternatives...');
+
+  const aiEl = addStreamingMsg(isInc ? 'incMsgs' : 'ordMsgs');
+  aiEl.innerHTML = '';
+  startTimer(isInc ? 'incStatus' : 'ordStatus');
+
+  let currentToolEl = null;
+
+  try {
+    const response = await fetch('/api/incident/approve', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ sessionId, approved, feedback })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    await readSSE(response, evt => {
+      if (isInc) {
+        handleIncidentEvent(evt, aiEl, () => currentToolEl, el => { currentToolEl = el; });
+      } else {
+        handleOrderEvent(evt, aiEl, () => currentToolEl, el => { currentToolEl = el; });
+      }
+    });
+
+  } catch (err) {
+    aiEl.textContent = `❌ Error: ${err.message}`;
+    aiEl.style.color = '#dc2626';
+    stopTimer(isInc ? 'incStatus' : 'ordStatus', '<span style="color:#dc2626">Error</span>');
+    if (isInc) { STATE.inc.busy = false; document.getElementById('incBtn').disabled = false; }
+    else       { STATE.ord.busy = false; document.getElementById('ordBtn').disabled = false; }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// ORDER MANAGEMENT
+// ─────────────────────────────────────────────────────────────
+async function sendOrder() {
+  if (STATE.ord.busy) return;
+  const input = document.getElementById('ordInput');
+  const msg   = input.value.trim();
+  if (!msg) return;
+
+  STATE.ord.busy      = true;
+  STATE.ord.sessionId = null;
+  input.value = '';
+  document.getElementById('ordBtn').disabled = true;
+  document.getElementById('ordApproval').style.display = 'none';
+
+  clearToolLog('ordToolLog');
+  addMsg('ordMsgs', 'user', msg);
+  const aiEl = addStreamingMsg('ordMsgs');
+  aiEl.innerHTML = '';
+  startTimer('ordStatus');
+
+  let currentToolEl = null;
+
+  try {
+    const response = await fetch('/api/incident/order', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ message: msg })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    await readSSE(response, evt => handleOrderEvent(evt, aiEl, () => currentToolEl, el => { currentToolEl = el; }));
+
+  } catch (err) {
+    aiEl.textContent = `❌ Error: ${err.message}`;
+    aiEl.style.color = '#dc2626';
+    stopTimer('ordStatus', '<span style="color:#dc2626">Error</span>');
+    STATE.ord.busy = false;
+    document.getElementById('ordBtn').disabled = false;
+  }
+}
+
+function handleOrderEvent(evt, aiEl, getToolEl, setToolEl) {
+  if (evt.type === 'connected') {
+    STATE.ord.sessionId = evt.sessionId;
+    addMsg('ordMsgs','status',`Connected → ${evt.provider} | Session: ${evt.sessionId}`);
+  }
+  else if (evt.type === 'status') {
+    document.querySelectorAll('#ordMsgs .msg-status').forEach(e => e.remove());
+    addMsg('ordMsgs','status', evt.message);
+  }
+  else if (evt.type === 'tool_call') {
+    const prev = getToolEl();
+    if (prev) updateToolLog(prev, 'done');
+    setToolEl(addToolLog('ordToolLog', evt.toolName, 'running'));
+  }
+  else if (evt.type === 'approval_required') {
+    STATE.ord.sessionId = evt.sessionId;
+    const prev = getToolEl();
+    if (prev) updateToolLog(prev, 'running');
+    document.querySelectorAll('#ordMsgs .msg-status').forEach(e => e.remove());
+    aiEl.textContent = evt.message || 'Approval required.';
+    document.getElementById('ordApprovalMsg').textContent =
+      `Action: ${evt.toolName}\nDetails: ${JSON.stringify(evt.toolArgs, null, 2)}`;
+    document.getElementById('ordApproval').style.display = 'block';
+    stopTimer('ordStatus', `<span style="color:#d97706">⏳ Awaiting confirmation...</span>`);
+    document.getElementById('ordMsgs').scrollTop = 99999;
+  }
+  else if (evt.type === 'complete') {
+    const prev = getToolEl();
+    if (prev) updateToolLog(prev, 'done');
+    document.querySelectorAll('#ordMsgs .msg-status').forEach(e => e.remove());
+    if (aiEl.querySelector('.typing')) aiEl.innerHTML = '';
+    aiEl.textContent = evt.answer;
+    stopTimer('ordStatus', `<span class="done-badge"><i class="bi bi-check-circle-fill"></i> ${evt.latencyMs}ms · ${evt.toolCallCount} tool call${evt.toolCallCount!==1?'s':''}</span>`);
+    STATE.ord.busy = false;
+    document.getElementById('ordBtn').disabled = false;
+  }
+  else if (evt.type === 'error') {
+    if (aiEl.querySelector('.typing')) aiEl.innerHTML = '';
+    aiEl.textContent = `❌ ${evt.message}`;
+    aiEl.style.color = '#dc2626';
+    const prev = getToolEl();
+    if (prev) updateToolLog(prev, 'error');
+    stopTimer('ordStatus', '<span style="color:#dc2626">Failed</span>');
+    STATE.ord.busy = false;
+    document.getElementById('ordBtn').disabled = false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────
+async function init() {
+  // Load config
+  try {
+    const r = await fetch('/api/config');
+    const d = await r.json();
+    STATE.provider = d.provider;
+    document.getElementById('modelBadge').textContent = d.model;
+    document.getElementById('btnGemini').classList.toggle('active', d.provider==='gemini');
+    document.getElementById('btnOllama').classList.toggle('active', d.provider==='ollama');
+  } catch {}
+
+  // Load tools list
+  try {
+    const r = await fetch('/api/agent/tools');
+    const d = await r.json();
+    const list = document.getElementById('toolList');
+    list.innerHTML = d.data.tools.map(t =>
+      `<span>🔧 ${t.replace(/_/g,' ')}</span><br>`
+    ).join('');
+  } catch {
+    document.getElementById('toolList').textContent = 'Could not load tools';
+  }
+}
+
+init();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,77 +1,32 @@
 import { ALL_TOOL_EXECUTORS } from './tool-registry.js';
 
-// ── Execute a single tool with retry logic ────────────────────
-export async function executeTool(
-  toolName,
-  toolArguments,
-  options = {}
-) {
-  const {
-    maxRetries = 2,
-    retryDelayMs = 1000,
-    retryOnError = true
-  } = options;
+export async function executeTool(name, args = {}) {
+  console.log(`\n[TOOL] ▶ ${name} | args: ${JSON.stringify(args)}`);
 
-  console.log(`\n[TOOL] ▶ Executing: ${toolName}`);
-  console.log(`[TOOL]   Args: ${JSON.stringify(toolArguments)}`);
-
-  const executor = ALL_TOOL_EXECUTORS[toolName];
-
-  if (!executor) {
-    console.error(`[TOOL] ✗ Unknown tool: ${toolName}`);
-    return {
-      success: false,
-      error: `Unknown tool: ${toolName}. Available tools: ${Object.keys(ALL_TOOL_EXECUTORS).join(', ')}`
-    };
+  const fn = ALL_TOOL_EXECUTORS[name];
+  if (!fn) {
+    const err = `Unknown tool: "${name}". Available: ${Object.keys(ALL_TOOL_EXECUTORS).join(', ')}`;
+    console.error(`[TOOL] ✗ ${err}`);
+    return { success: false, error: err };
   }
 
-  let lastError = null;
-  const startTime = Date.now();
-
-  // Retry loop
-  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
-    try {
-      const result = await executor(toolArguments);
-      const latencyMs = Date.now() - startTime;
-
-      console.log(`[TOOL] ✓ ${toolName} completed in ${latencyMs}ms (attempt ${attempt})`);
-
-      return result;
-
-    } catch (error) {
-      lastError = error;
-      console.error(`[TOOL] ✗ ${toolName} attempt ${attempt} failed: ${error.message}`);
-
-      // Don't retry if it's a business logic error (not a technical error)
-      if (!retryOnError) break;
-      if (attempt <= maxRetries) {
-        const delay = retryDelayMs * attempt; // exponential backoff
-        console.log(`[TOOL]   Retrying in ${delay}ms...`);
-        await new Promise(r => setTimeout(r, delay));
-      }
-    }
+  const t0 = Date.now();
+  try {
+    const result = await fn(args);
+    console.log(`[TOOL] ✓ ${name} in ${Date.now()-t0}ms`);
+    return result;
+  } catch (err) {
+    console.error(`[TOOL] ✗ ${name} error: ${err.message}`);
+    return { success: false, error: err.message };
   }
-
-  return {
-    success: false,
-    error: `Tool failed after ${maxRetries + 1} attempts: ${lastError?.message}`
-  };
 }
 
-// ── Execute multiple tools in parallel ────────────────────────
 export async function executeToolsParallel(toolCalls) {
-  console.log(`\n[TOOL] ⚡ Running ${toolCalls.length} tools in parallel:`);
-  toolCalls.forEach(t => console.log(`[TOOL]   - ${t.name}`));
-
   const results = await Promise.allSettled(
     toolCalls.map(({ name, args }) => executeTool(name, args))
   );
-
-  return results.map((result, index) => ({
-    toolName: toolCalls[index].name,
-    success: result.status === 'fulfilled',
-    result: result.status === 'fulfilled'
-      ? result.value
-      : { success: false, error: result.reason?.message }
+  return results.map((r, i) => ({
+    toolName: toolCalls[i].name,
+    result:   r.status === 'fulfilled' ? r.value : { success: false, error: r.reason?.message }
   }));
 }

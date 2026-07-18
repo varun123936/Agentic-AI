@@ -1,265 +1,109 @@
 import express from 'express';
 import { createIncidentAgent } from '../agents/incident.agent.js';
-import { createOrderAgent } from '../agents/order.agent.js';
+import { createOrderAgent }    from '../agents/order.agent.js';
+import { AI_CONFIG }           from '../config/ai.config.js';
 
-const router = express.Router();
+const router  = express.Router();
+const PENDING = new Map();
 
-// In-memory session store for approval flows
-// In production: use Redis with TTL
-const pendingApprovals = new Map();
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, v] of PENDING) if (now - v.ts > 30*60*1000) PENDING.delete(id);
+}, 5*60*1000);
 
-// ── POST /api/incident/investigate ────────────────────────────
-// Start an incident investigation
-router.post('/investigate', async (req, res) => {
-  const { message } = req.body;
-
-  if (!message?.trim()) {
-    return res.status(400).json({
-      success: false,
-      error: 'message is required'
-    });
-  }
-
-  // SSE headers for streaming status
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+function sseSetup(res, req) {
+  res.setHeader('Content-Type','text/event-stream');
+  res.setHeader('Cache-Control','no-cache');
+  res.setHeader('Connection','keep-alive');
+  res.setHeader('X-Accel-Buffering','no');
+  res.setHeader('Access-Control-Allow-Origin','*');
   res.flushHeaders();
+  let ended = false;
+  const ping = setInterval(() => { if (!ended && !res.writableEnded) res.write(':ping\n\n'); else clearInterval(ping); }, 20000);
+  const w = d => { if (!ended && !res.writableEnded) { try { res.write(`data: ${JSON.stringify(d)}\n\n`); } catch {} } };
+  const e = () => { if (!ended) { ended=true; clearInterval(ping); try { res.end(); } catch {} } };
+  req.on('close', () => { ended=true; clearInterval(ping); });
+  return { w, e };
+}
 
-  const sessionId = `INC-${Date.now()}`;
-  const startTime = Date.now();
+router.post('/investigate', async (req, res) => {
+  if (!req.body.message?.trim()) return res.status(400).json({ error:'message required' });
+  const { w, e } = sseSetup(res, req);
+  const sid = `INC-${Date.now()}`;
+  const t   = Date.now();
+  w({ type:'connected', sessionId:sid, provider:AI_CONFIG.provider });
 
   const agent = createIncidentAgent({
-    onStatus: (msg) => {
-      res.write(`data: ${JSON.stringify({
-        type: 'status',
-        message: msg,
-        sessionId
-      })}\n\n`);
-    },
-    onToolCall: ({ name, args }) => {
-      res.write(`data: ${JSON.stringify({
-        type: 'tool_call',
-        toolName: name,
-        args,
-        sessionId
-      })}\n\n`);
-    },
-    onApprovalNeeded: () => {} // handled in return value check below
+    onStatus:   m => w({ type:'status', message:m, sessionId:sid }),
+    onToolCall: ({ name }) => w({ type:'tool_call', toolName:name, sessionId:sid })
   });
 
   try {
-    const result = await agent.run(message);
-
-    if (result.status === 'awaiting_approval') {
-      // Save state for resume
-      pendingApprovals.set(sessionId, {
-        approvalState: result,
-        agent,
-        createdAt: Date.now()
-      });
-
-      res.write(`data: ${JSON.stringify({
-        type: 'approval_required',
-        sessionId,
-        toolName: result.pendingApproval.toolName,
-        toolArgs: result.pendingApproval.toolArgs,
-        message: result.message,
-        executionLog: result.executionLog
-      })}\n\n`);
-
+    const r = await agent.run(req.body.message);
+    if (r.status === 'awaiting_approval') {
+      PENDING.set(sid, { state:r, agent, ts:Date.now() });
+      w({ type:'approval_required', sessionId:sid, toolName:r.pendingApproval.toolName, toolArgs:r.pendingApproval.toolArgs, message:r.message, executionLog:r.executionLog });
     } else {
-      res.write(`data: ${JSON.stringify({
-        type: 'complete',
-        answer: result.answer,
-        toolCallCount: result.toolCallCount,
-        latencyMs: Date.now() - startTime,
-        executionLog: result.executionLog,
-        sessionId
-      })}\n\n`);
+      w({ type:'complete', answer:r.answer, toolCallCount:r.toolCallCount, latencyMs:Date.now()-t, executionLog:r.executionLog, sessionId:sid });
     }
-
-  } catch (error) {
-    res.write(`data: ${JSON.stringify({
-      type: 'error',
-      message: error.message,
-      sessionId
-    })}\n\n`);
-  }
-
-  res.end();
+  } catch (err) { w({ type:'error', message:err.message, sessionId:sid }); }
+  finally { e(); }
 });
 
-// ── POST /api/incident/approve ─────────────────────────────────
-// Human approves or denies a pending action
 router.post('/approve', async (req, res) => {
   const { sessionId, approved, feedback } = req.body;
+  if (!sessionId) return res.status(400).json({ error:'sessionId required' });
+  if (typeof approved !== 'boolean') return res.status(400).json({ error:'approved must be boolean' });
 
-  if (!sessionId) {
-    return res.status(400).json({
-      success: false,
-      error: 'sessionId is required'
-    });
-  }
+  const p = PENDING.get(sessionId);
+  if (!p) return res.status(404).json({ error:'Session not found or expired' });
+  PENDING.delete(sessionId);
 
-  const pending = pendingApprovals.get(sessionId);
-  if (!pending) {
-    return res.status(404).json({
-      success: false,
-      error: 'Session not found or expired. Please start a new investigation.'
-    });
-  }
-
-  // SSE headers
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.flushHeaders();
-
-  const startTime = Date.now();
-  const { approvalState, agent } = pending;
-  pendingApprovals.delete(sessionId); // consume the approval
+  const { w, e } = sseSetup(res, req);
+  const t = Date.now();
+  w({ type:'status', message: approved ? '✅ Approved. Executing...' : '❌ Denied. Finding alternatives...' });
 
   try {
-    // Notify status
-    res.write(`data: ${JSON.stringify({
-      type: 'status',
-      message: approved
-        ? 'Approval received. Executing action...'
-        : 'Action denied. Finding alternatives...'
-    })}\n\n`);
-
-    // Resume agent
-    const result = await agent.resumeAfterApproval(
-      approvalState,
-      approved,
-      feedback
-    );
-
-    // Check if another approval is needed
-    if (result.status === 'awaiting_approval') {
-      const newSessionId = `INC-${Date.now()}`;
-      pendingApprovals.set(newSessionId, {
-        approvalState: result,
-        agent,
-        createdAt: Date.now()
-      });
-
-      res.write(`data: ${JSON.stringify({
-        type: 'approval_required',
-        sessionId: newSessionId,
-        toolName: result.pendingApproval.toolName,
-        toolArgs: result.pendingApproval.toolArgs,
-        message: result.message
-      })}\n\n`);
-
+    const r = await p.agent.resumeAfterApproval(p.state, approved, feedback || '');
+    if (r.status === 'awaiting_approval') {
+      const nid = `INC-${Date.now()}`;
+      PENDING.set(nid, { state:r, agent:p.agent, ts:Date.now() });
+      w({ type:'approval_required', sessionId:nid, toolName:r.pendingApproval.toolName, toolArgs:r.pendingApproval.toolArgs, message:r.message });
     } else {
-      res.write(`data: ${JSON.stringify({
-        type: 'complete',
-        answer: result.answer,
-        toolCallCount: result.toolCallCount,
-        latencyMs: Date.now() - startTime,
-        executionLog: result.executionLog
-      })}\n\n`);
+      w({ type:'complete', answer:r.answer, toolCallCount:r.toolCallCount, latencyMs:Date.now()-t, executionLog:r.executionLog });
     }
-
-  } catch (error) {
-    res.write(`data: ${JSON.stringify({
-      type: 'error',
-      message: error.message
-    })}\n\n`);
-  }
-
-  res.end();
+  } catch (err) { w({ type:'error', message:err.message }); }
+  finally { e(); }
 });
 
-// ── POST /api/incident/order ───────────────────────────────────
-// Order management with approval flow
 router.post('/order', async (req, res) => {
-  const { message } = req.body;
-
-  if (!message?.trim()) {
-    return res.status(400).json({
-      success: false,
-      error: 'message is required'
-    });
-  }
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.flushHeaders();
-
-  const sessionId = `ORD-${Date.now()}`;
-  const startTime = Date.now();
+  if (!req.body.message?.trim()) return res.status(400).json({ error:'message required' });
+  const { w, e } = sseSetup(res, req);
+  const sid = `ORD-${Date.now()}`;
+  const t   = Date.now();
+  w({ type:'connected', sessionId:sid, provider:AI_CONFIG.provider });
 
   const agent = createOrderAgent({
-    onStatus: (msg) => {
-      res.write(`data: ${JSON.stringify({
-        type: 'status', message: msg, sessionId
-      })}\n\n`);
-    },
-    onToolCall: ({ name }) => {
-      res.write(`data: ${JSON.stringify({
-        type: 'tool_call', toolName: name, sessionId
-      })}\n\n`);
-    }
+    onStatus:   m => w({ type:'status', message:m, sessionId:sid }),
+    onToolCall: ({ name }) => w({ type:'tool_call', toolName:name, sessionId:sid })
   });
 
   try {
-    const result = await agent.run(message);
-
-    if (result.status === 'awaiting_approval') {
-      pendingApprovals.set(sessionId, {
-        approvalState: result,
-        agent,
-        createdAt: Date.now()
-      });
-
-      res.write(`data: ${JSON.stringify({
-        type: 'approval_required',
-        sessionId,
-        toolName: result.pendingApproval.toolName,
-        toolArgs: result.pendingApproval.toolArgs,
-        message: result.message
-      })}\n\n`);
-
+    const r = await agent.run(req.body.message);
+    if (r.status === 'awaiting_approval') {
+      PENDING.set(sid, { state:r, agent, ts:Date.now() });
+      w({ type:'approval_required', sessionId:sid, toolName:r.pendingApproval.toolName, toolArgs:r.pendingApproval.toolArgs, message:r.message, executionLog:r.executionLog });
     } else {
-      res.write(`data: ${JSON.stringify({
-        type: 'complete',
-        answer: result.answer,
-        toolCallCount: result.toolCallCount,
-        latencyMs: Date.now() - startTime,
-        executionLog: result.executionLog
-      })}\n\n`);
+      w({ type:'complete', answer:r.answer, toolCallCount:r.toolCallCount, latencyMs:Date.now()-t, executionLog:r.executionLog, sessionId:sid });
     }
-
-  } catch (error) {
-    res.write(`data: ${JSON.stringify({
-      type: 'error', message: error.message, sessionId
-    })}\n\n`);
-  }
-
-  res.end();
+  } catch (err) { w({ type:'error', message:err.message, sessionId:sid }); }
+  finally { e(); }
 });
 
-// ── GET /api/incident/pending ──────────────────────────────────
-// List pending approvals
 router.get('/pending', (req, res) => {
-  const pending = [];
-  for (const [id, val] of pendingApprovals.entries()) {
-    pending.push({
-      sessionId: id,
-      toolName: val.approvalState.pendingApproval.toolName,
-      createdAt: new Date(val.createdAt).toISOString(),
-      ageMs: Date.now() - val.createdAt
-    });
-  }
-
-  res.json({ success: true, data: { count: pending.length, pending } });
+  const list = [];
+  for (const [id, v] of PENDING) list.push({ sessionId:id, toolName:v.state.pendingApproval.toolName, ageSeconds: Math.floor((Date.now()-v.ts)/1000) });
+  res.json({ success:true, data:{ count:list.length, pending:list } });
 });
 
 export default router;

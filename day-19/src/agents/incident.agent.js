@@ -1,45 +1,25 @@
-// Incident Response Agent
-// Investigates service issues and takes corrective action
-// with human approval for destructive operations
-
-import { BaseAgent } from './base.agent.js';
+import { BaseAgent }         from './base.agent.js';
 import { devopsToolDefinitions } from '../mcp/tools/devops.tool.js';
+import { AI_CONFIG }         from '../config/ai.config.js';
 
-const INCIDENT_SYSTEM_PROMPT = `You are an expert DevOps incident response agent.
-Your job is to investigate service issues and resolve them systematically.
+const SYSTEM = `You are an expert DevOps incident response agent running on ${AI_CONFIG.provider === 'gemini' ? 'Gemini 2.0 Flash' : 'Ollama gemma4:cloud'}.
 
 Investigation Protocol:
-1. First call check_all_services to get a system overview
-2. For each degraded/down service, call check_service_health for details
-3. Call get_service_logs to understand the ROOT CAUSE
-4. Analyze the logs and form a diagnosis
-5. Propose a fix — but WAIT for approval before restart_service or scale_service
-6. After resolution, always call create_incident_report
+1. Call check_all_services to see overall health
+2. For each degraded/down service call check_service_health
+3. Call get_service_logs to find root cause
+4. Diagnose and propose fix
+5. STOP and request approval before restart_service
+6. After fix, call create_incident_report
 
-Response Format:
-- Be technical and precise
-- State what you found, what you conclude, and what you recommend
-- For destructive actions (restart, scale), clearly state what you plan to do
-  and ask for approval explicitly
-- Always create an incident report at the end
-
-Severity Classification:
-- P1: Service completely down, affecting all users
-- P2: Service degraded, affecting some users
-- P3: Performance degraded, users experiencing slowness
-- P4: Minor issue, no user impact`;
+Severity: P1=down, P2=degraded, P3=slow, P4=minor`;
 
 export function createIncidentAgent(callbacks = {}) {
   return new BaseAgent({
-    name: 'IncidentAgent',
-    systemPrompt: INCIDENT_SYSTEM_PROMPT,
-    maxToolRounds: 15,
-    temperature: 0.1,   // Very low — we want precise, consistent reasoning
+    name: 'IncidentAgent', systemPrompt: SYSTEM,
+    maxToolRounds: 12, temperature: 0.1,
     tools: devopsToolDefinitions,
-
-    // These tools require human approval before execution
-    requiresApproval: ['restart_service', 'scale_service'],
-
+    requiresApproval: ['restart_service'],
     ...callbacks
   });
 }
