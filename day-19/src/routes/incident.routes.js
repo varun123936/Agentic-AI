@@ -7,7 +7,7 @@ const router  = express.Router();
 const PENDING = new Map();
 setInterval(() => { const now=Date.now(); for(const [id,v] of PENDING) if(now-v.ts>30*60*1000) PENDING.delete(id); }, 5*60*1000);
 
-function sse(res, req) {
+function sse(res) {
   res.setHeader('Content-Type','text/event-stream');
   res.setHeader('Cache-Control','no-cache');
   res.setHeader('Connection','keep-alive');
@@ -17,12 +17,14 @@ function sse(res, req) {
   const ping = setInterval(() => { if(!ended&&!res.writableEnded) res.write(':ping\n\n'); else clearInterval(ping); }, 20000);
   const w = d => { if(!ended&&!res.writableEnded) { try { res.write(`data: ${JSON.stringify(d)}\n\n`); } catch {} } };
   const e = () => { if(!ended) { ended=true; clearInterval(ping); try{res.end();}catch{} } };
-  req.on('close', () => { ended=true; clearInterval(ping); });
+  // A completed POST body also emits `req.close`; only the response close
+  // represents the SSE client connection going away.
+  res.on('close', () => { ended=true; clearInterval(ping); });
   return { w, e };
 }
 
 async function runAgent(agent, message, sessionPrefix, res, req) {
-  const { w, e } = sse(res, req);
+  const { w, e } = sse(res);
   const sid = `${sessionPrefix}-${Date.now()}`;
   const t   = Date.now();
   w({ type:'connected', sessionId:sid, provider:AI_CONFIG.provider, model:AI_CONFIG.provider==='gemini'?'gemini-2.0-flash':AI_CONFIG.ollama.model });
@@ -45,7 +47,7 @@ router.post('/investigate', async (req,res) => {
     onToolCall: ({ name }) => {}
   });
   // Attach SSE and status callbacks properly
-  const { w, e } = sse(res, req);
+  const { w, e } = sse(res);
   const sid=`INC-${Date.now()}`; const t=Date.now();
   w({ type:'connected', sessionId:sid, provider:AI_CONFIG.provider, model:AI_CONFIG.provider==='gemini'?'gemini-2.0-flash':AI_CONFIG.ollama.model });
   const a = createIncidentAgent({
@@ -66,7 +68,7 @@ router.post('/investigate', async (req,res) => {
 
 router.post('/order', async (req,res) => {
   if (!req.body.message?.trim()) return res.status(400).json({ error:'message required' });
-  const { w, e } = sse(res, req);
+  const { w, e } = sse(res);
   const sid=`ORD-${Date.now()}`; const t=Date.now();
   w({ type:'connected', sessionId:sid, provider:AI_CONFIG.provider });
   const a = createOrderAgent({
@@ -92,7 +94,7 @@ router.post('/approve', async (req,res) => {
   const p = PENDING.get(sessionId);
   if (!p) return res.status(404).json({ error:'Session not found or expired' });
   PENDING.delete(sessionId);
-  const { w, e } = sse(res, req);
+  const { w, e } = sse(res);
   const t=Date.now();
   w({ type:'status', message: approved?'✅ Approved. Executing...':'❌ Denied. Finding alternatives...' });
   try {

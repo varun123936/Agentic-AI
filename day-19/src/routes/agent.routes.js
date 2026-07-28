@@ -7,7 +7,7 @@ import { AI_CONFIG }    from '../config/ai.config.js';
 const router = express.Router();
 const SYS    = 'You are a helpful AI assistant. Use tools for real data. Never guess.';
 
-function sse(res, req) {
+function sse(res) {
   res.setHeader('Content-Type','text/event-stream');
   res.setHeader('Cache-Control','no-cache');
   res.setHeader('Connection','keep-alive');
@@ -17,7 +17,9 @@ function sse(res, req) {
   const ping = setInterval(() => { if(!ended&&!res.writableEnded) res.write(':ping\n\n'); else clearInterval(ping); }, 20000);
   const w = d => { if(!ended&&!res.writableEnded) { try { res.write(`data: ${JSON.stringify(d)}\n\n`); } catch {} } };
   const e = () => { if(!ended) { ended=true; clearInterval(ping); try{res.end();}catch{} } };
-  req.on('close', () => { ended=true; clearInterval(ping); });
+  // `req.close` fires after Express has consumed a POST body, which is not a
+  // client disconnect. Track the response connection instead.
+  res.on('close', () => { ended=true; clearInterval(ping); });
   return { w, e };
 }
 
@@ -35,9 +37,11 @@ router.post('/chat', async (req,res) => {
 router.post('/stream', async (req,res) => {
   const { message, history=[] } = req.body;
   if (!message?.trim()) return res.status(400).json({ error:'message required' });
-  const { w, e } = sse(res, req);
+  const { w, e } = sse(res);
   const ac=new AbortController(); const t=Date.now();
-  req.on('close', () => ac.abort());
+  // Abort the upstream model request only if the client drops the SSE
+  // connection before this route has completed its response.
+  res.once('close', () => { if (!res.writableEnded) ac.abort(); });
   w({ type:'connected', provider:AI_CONFIG.provider, model:AI_CONFIG.provider==='gemini'?'gemini-2.0-flash':AI_CONFIG.ollama.model });
   try {
     await streamAIWithTools(message, SYS, history,
