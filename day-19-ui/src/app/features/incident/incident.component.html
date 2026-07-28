@@ -47,7 +47,7 @@
       <div class="px-3 pb-2">
         <app-approval-box
           #approvalBox
-          [state]="approval"
+          [state]="approval()"
           (approve)="onApproval($event)"
         ></app-approval-box>
       </div>

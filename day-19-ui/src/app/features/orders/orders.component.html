@@ -41,7 +41,7 @@
       </div>
 
       <div class="px-3 pb-2">
-        <app-approval-box [state]="approval" (approve)="onApproval($event)"></app-approval-box>
+        <app-approval-box [state]="approval()" (approve)="onApproval($event)"></app-approval-box>
       </div>
 
       <div class="card-footer bg-white border-top p-2">

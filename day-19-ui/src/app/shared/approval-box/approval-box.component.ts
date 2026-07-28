@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, signal } from '@angular/core';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApprovalState } from '../../core/models/agent.models';
@@ -8,18 +8,18 @@ import { ApprovalState } from '../../core/models/agent.models';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    @if (state()) {
+    @if (state) {
       <div class="approval-wrap">
         <div class="approval-header">
           <i class="bi bi-shield-exclamation text-warning"></i>
           <strong>Action Requires Your Approval</strong>
         </div>
 
-        <p class="approval-msg">{{ state()!.message }}</p>
+        <p class="approval-msg">{{ state.message }}</p>
 
         <div class="approval-detail">
-          <small class="text-muted">Tool: <strong>{{ state()!.toolName }}</strong></small>
-          <pre class="approval-args">{{ state()!.toolArgs | json }}</pre>
+          <small class="text-muted">Tool: <strong>{{ state.toolName }}</strong></small>
+          <pre class="approval-args">{{ state.toolArgs | json }}</pre>
         </div>
 
         <input
@@ -55,7 +55,7 @@ import { ApprovalState } from '../../core/models/agent.models';
   `]
 })
 export class ApprovalBoxComponent {
-  @Input()  state = signal<ApprovalState | null>(null);
+  @Input() state: ApprovalState | null = null;
   @Output() approve = new EventEmitter<{ approved: boolean; feedback: string }>();
 
   feedback = '';

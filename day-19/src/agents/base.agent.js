@@ -18,6 +18,9 @@ export class BaseAgent {
     this.name=opts.name||'Agent'; this.systemPrompt=opts.systemPrompt||'You are helpful.';
     this.maxToolRounds=opts.maxToolRounds||10; this.temperature=opts.temperature||0.2;
     this.availableTools=opts.tools||[]; this.requiresApproval=opts.requiresApproval||[];
+    if (this.requiresApproval.length) {
+      this.systemPrompt += `\n\nAPPROVAL WORKFLOW: If you recommend an action that uses ${this.requiresApproval.join(', ')}, call that tool with the required arguments. The runtime will intercept the call and present the user with an approval control. Do not ask for approval only in plain text, and do not give a final answer before issuing the required tool call.`;
+    }
     this.onToolCall=opts.onToolCall||null; this.onStatus=opts.onStatus||null;
   }
 
