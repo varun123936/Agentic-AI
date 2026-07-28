@@ -1,0 +1,53 @@
+<!-- Navbar -->
+<nav class="app-navbar">
+  <a class="brand" routerLink="/chat">
+    <div class="brand-dot">AI</div>
+    <span class="brand-name">Agent Dashboard — Day 19</span>
+  </a>
+
+  <!-- Nav links -->
+  <div class="nav-links">
+    <a class="nav-link" routerLink="/chat"      routerLinkActive="active">
+      <i class="bi bi-chat-dots"></i> Chat
+    </a>
+    <a class="nav-link" routerLink="/incident"  routerLinkActive="active">
+      <i class="bi bi-activity"></i> Incident
+    </a>
+    <a class="nav-link" routerLink="/orders"    routerLinkActive="active">
+      <i class="bi bi-bag-check"></i> Orders
+    </a>
+  </div>
+
+  <!-- Provider toggle -->
+  <div class="provider-section">
+    <span class="model-badge">{{ modelName() }}</span>
+    <div class="provider-btns">
+      <button
+        class="prov-btn"
+        [class.active]="provider() === 'gemini'"
+        (click)="switchProvider('gemini')"
+        [disabled]="isSwitching()"
+      >
+        <i class="bi bi-stars"></i> Gemini 2.0
+      </button>
+      <button
+        class="prov-btn"
+        [class.active]="provider() === 'ollama'"
+        (click)="switchProvider('ollama')"
+        [disabled]="isSwitching()"
+      >
+        @if (isSwitching()) {
+          <span class="spinner-border spinner-border-sm"></span>
+        } @else {
+          <i class="bi bi-cpu"></i>
+        }
+        Ollama
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- Page content -->
+<div class="page-content">
+  <router-outlet></router-outlet>
+</div>

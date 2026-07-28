@@ -1,0 +1,105 @@
+<div class="ord-layout">
+
+  <div class="ord-left">
+    <div class="card h-100 d-flex flex-column">
+
+      <div class="card-header d-flex align-items-center justify-content-between py-2">
+        <span class="fw-semibold">
+          <i class="bi bi-bag-check text-success me-2"></i>Order Management Agent
+        </span>
+        @if (latencyText()) {
+          <span class="badge bg-success-subtle text-success border border-success-subtle small">
+            {{ latencyText() }}
+          </span>
+        }
+      </div>
+
+      <div #msgContainer class="msg-area flex-grow-1">
+        @for (msg of messages(); track msg.id) {
+          @if (msg.role === 'user') {
+            <div class="msg-row justify-content-end">
+              <div class="msg-bubble msg-user">{{ msg.content }}</div>
+              <div class="msg-avatar user-av"><i class="bi bi-person-fill"></i></div>
+            </div>
+          }
+          @if (msg.role === 'assistant') {
+            <div class="msg-row justify-content-start">
+              <div class="msg-avatar ai-av"><i class="bi bi-bag-heart"></i></div>
+              <div class="msg-bubble msg-ai">
+                @if (!msg.content && isStreaming()) {
+                  <div class="typing-dots"><span></span><span></span><span></span></div>
+                } @else {
+                  {{ msg.content }}
+                }
+              </div>
+            </div>
+          }
+        }
+        @if (statusText() && isStreaming()) {
+          <div class="status-pill"><span class="spin-icon">⟳</span> {{ statusText() }}</div>
+        }
+      </div>
+
+      <div class="px-3 pb-2">
+        <app-approval-box [state]="approval" (approve)="onApproval($event)"></app-approval-box>
+      </div>
+
+      <div class="card-footer bg-white border-top p-2">
+        <div class="input-group">
+          <textarea class="form-control chat-input" rows="1" placeholder="Ask about your orders or products..."
+            [value]="inputText()" (input)="inputText.set($any($event.target).value)"
+            (keydown)="onKeydown($event)" [disabled]="isStreaming()"></textarea>
+          <button class="btn btn-success" (click)="send()" [disabled]="!inputText().trim() || isStreaming()">
+            @if (isStreaming()) {
+              <span class="spinner-border spinner-border-sm"></span>
+            } @else {
+              <i class="bi bi-send-fill"></i>
+            }
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="ord-right">
+    <div class="card mb-3">
+      <div class="card-header py-2">
+        <span class="fw-semibold small"><i class="bi bi-wrench text-warning me-1"></i>Tool Log</span>
+      </div>
+      <div class="card-body p-2">
+        <app-tool-log [logs]="toolLogs"></app-tool-log>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header py-2">
+        <span class="fw-semibold small"><i class="bi bi-lightning text-warning me-1"></i>Quick</span>
+      </div>
+      <div class="card-body p-2">
+        @for (q of QUICK; track q.label) {
+          <button class="quick-btn w-100 text-start mb-1" (click)="useQuick(q.q)" [disabled]="isStreaming()">
+            <i class="bi {{ q.icon }} text-success me-2"></i>{{ q.label }}
+          </button>
+        }
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header py-2">
+        <span class="fw-semibold small"><i class="bi bi-database text-primary me-1"></i>Seeded Data</span>
+      </div>
+      <div class="card-body" style="font-size:.75rem;color:#6b7280;line-height:2">
+        <strong>Orders:</strong><br>
+        ORD-1001 — Shipped (MacBook)<br>
+        ORD-1002 — Pending (iPhone) ← cancellable<br>
+        ORD-1003 — Delivered (Headphones)<br><br>
+        <strong>Products:</strong><br>
+        PROD-001 MacBook (in stock)<br>
+        PROD-002 iPhone (low stock)<br>
+        PROD-003 Sony (out of stock)
+      </div>
+    </div>
+  </div>
+
+</div>

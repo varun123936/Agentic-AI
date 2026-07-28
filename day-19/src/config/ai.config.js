@@ -15,7 +15,7 @@ export const AI_CONFIG = {
 
   ollama: {
     baseUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
-    model: 'gemma4:cloud',
+    model: process.env.OLLAMA_MODEL || 'gemma4:cloud',
     temperature: 0.2
   }
 };

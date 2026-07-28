@@ -1,0 +1,123 @@
+<div class="chat-layout">
+
+  <!-- Messages -->
+  <div class="chat-left">
+    <div class="card h-100 d-flex flex-column">
+
+      <div class="card-header d-flex align-items-center justify-content-between py-2">
+        <span class="fw-semibold">
+          <i class="bi bi-chat-dots text-primary me-2"></i>AI Chat Agent
+        </span>
+        @if (latencyText()) {
+          <span class="badge bg-success-subtle text-success border border-success-subtle small">
+            {{ latencyText() }}
+          </span>
+        }
+      </div>
+
+      <!-- Message area -->
+      <div #msgContainer class="msg-area flex-grow-1">
+        @for (msg of messages(); track msg.id) {
+          @if (msg.role === 'user') {
+            <div class="msg-row justify-content-end">
+              <div class="msg-bubble msg-user">{{ msg.content }}</div>
+              <div class="msg-avatar user-avatar"><i class="bi bi-person-fill"></i></div>
+            </div>
+          }
+          @if (msg.role === 'assistant') {
+            <div class="msg-row justify-content-start">
+              <div class="msg-avatar ai-avatar"><i class="bi bi-stars"></i></div>
+              <div class="msg-bubble msg-ai">
+                @if (!msg.content && isStreaming()) {
+                  <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                  </div>
+                } @else {
+                  {{ msg.content }}
+                  @if (msg.id === streamingMsgId && isStreaming()) {
+                    <span class="cursor-blink">|</span>
+                  }
+                }
+              </div>
+            </div>
+          }
+        }
+
+        <!-- Status bar -->
+        @if (statusText() && isStreaming()) {
+          <div class="status-pill">
+            <span class="spin-icon">⟳</span> {{ statusText() }}
+          </div>
+        }
+      </div>
+
+      <!-- Input -->
+      <div class="card-footer bg-white border-top p-2">
+        <div class="input-group">
+          <textarea
+            class="form-control chat-input"
+            rows="1"
+            placeholder="Ask about orders, products, weather..."
+            [value]="inputText()"
+            (input)="inputText.set($any($event.target).value)"
+            (keydown)="onKeydown($event)"
+            [disabled]="isStreaming()"
+          ></textarea>
+          <button
+            class="btn btn-primary"
+            (click)="send()"
+            [disabled]="!inputText().trim() || isStreaming()"
+          >
+            @if (isStreaming()) {
+              <span class="spinner-border spinner-border-sm"></span>
+            } @else {
+              <i class="bi bi-send-fill"></i>
+            }
+          </button>
+        </div>
+        <div class="d-flex justify-content-between mt-1" style="font-size:.7rem;color:#9ca3af;">
+          <span><kbd>Enter</kbd> send · <kbd>Shift+Enter</kbd> new line</span>
+          <span>{{ inputText().length }}/2000</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="chat-right">
+
+    <!-- Tool log -->
+    <div class="card mb-3">
+      <div class="card-header py-2">
+        <span class="fw-semibold small">
+          <i class="bi bi-wrench text-warning me-1"></i>Tool Execution
+        </span>
+      </div>
+      <div class="card-body p-2">
+        <app-tool-log [logs]="toolLogs"></app-tool-log>
+      </div>
+    </div>
+
+    <!-- Quick queries -->
+    <div class="card">
+      <div class="card-header py-2">
+        <span class="fw-semibold small">
+          <i class="bi bi-lightning text-warning me-1"></i>Quick Queries
+        </span>
+      </div>
+      <div class="card-body p-2">
+        @for (q of QUICK; track q.label) {
+          <button
+            class="quick-btn w-100 text-start mb-1"
+            (click)="useQuick(q.q)"
+            [disabled]="isStreaming()"
+          >
+            <i class="bi {{ q.icon }} text-primary me-2"></i>{{ q.label }}
+          </button>
+        }
+      </div>
+    </div>
+
+  </div>
+
+</div>
