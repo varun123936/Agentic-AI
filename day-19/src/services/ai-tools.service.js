@@ -17,6 +17,7 @@ function readSSE(body, onParsed, signal) {
   return new Promise((res, rej) => {
     if (signal?.aborted) { body.destroy(); return res(); }
     const onAbort = () => { body.destroy(); res(); };
+    
     signal?.addEventListener('abort', onAbort);
     let buf = '';
     body.on('data', raw => {
