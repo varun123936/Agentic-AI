@@ -1,0 +1,20 @@
+What is Multer?
+
+Multer is an Express middleware used to handle file uploads. It processes multipart/form-data requests and provides uploaded files through req.file or req.files.
+
+What is Buffer?
+
+Buffer is a Node.js object used to store raw binary data in memory. It is commonly used when reading files, images, PDFs, or network data.
+
+How are they used together?
+Upload File
+    ↓
+Multer receives file
+    ↓
+File stored in disk/memory
+    ↓
+Convert file to Buffer
+    ↓
+Pass Buffer to libraries like pdf-parse
+    ↓
+Extract data

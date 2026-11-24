@@ -1,0 +1,480 @@
+Basic SSE questions
+Q1. What is SSE?
+
+Answer:
+
+SSE stands for Server-Sent Events. It is a communication mechanism where the server sends data to the client progressively through a single HTTP response.
+
+In my AI chat application, instead of waiting for the complete response from Gemini, I receive generated text in chunks and immediately forward those chunks to the frontend.
+
+Q2. Why did you use SSE in your project?
+
+Answer:
+
+I used SSE to display AI-generated responses progressively. Without streaming, users would have to wait until Gemini generated the complete answer. With SSE, they can see the answer as it is being generated, which improves the user experience.
+
+Q3. What is the difference between normal HTTP response and SSE?
+
+Answer:
+
+In a normal API, the server generally sends the complete response and closes the request.
+
+In SSE, the server keeps the HTTP response open and sends multiple events over the same response. It closes the connection when streaming is complete.
+
+Q4. Is SSE based on HTTP or WebSocket?
+
+Answer:
+
+SSE is based on HTTP. It uses a long-lived HTTP response to send events from the server to the client.
+
+WebSocket is a different protocol that provides two-way communication between client and server.
+
+Q5. What are the advantages of SSE over polling?
+
+Answer:
+
+In polling, the frontend repeatedly sends requests to check whether new data is available.
+
+In SSE, the frontend establishes one connection and the server sends updates whenever data is available.
+
+This reduces unnecessary repeated requests and is useful for AI responses, notifications and progress updates.
+
+Q6. What is the difference between SSE and WebSocket?
+SSE	WebSocket
+One-way server-to-client communication	Two-way communication
+Uses HTTP	Uses WebSocket protocol
+Text-based event stream	Supports text and binary messages
+Suitable for AI text streaming and notifications	Suitable for chat, gaming and real-time collaboration
+
+Interview tip: If the interviewer asks why you didn't use WebSocket, say that your primary requirement was server-to-client streaming. SSE was simpler and sufficient for that requirement.
+Backend implementation questions
+Q7. How did you implement SSE in Node.js?
+
+Answer:
+
+I implemented SSE using Express.
+
+First, I validate the incoming user message. Then I set the response headers:
+res.setHeader('Content-Type', 'text/event-stream');
+res.setHeader('Cache-Control', 'no-cache');
+res.setHeader('Connection', 'keep-alive');
+res.flushHeaders();
+
+
+Then I call the AI streaming service. Whenever Gemini generates a chunk, I receive it through a callback and forward it to the frontend using res.write().
+
+When the AI finishes, I send a completion event and call res.end().
+
+Q8. What is the purpose of res.write() and res.end()?
+
+Answer:
+
+res.write() sends a piece of response data without closing the HTTP response.
+
+res.end() indicates that the server has finished sending data and closes the response.
+
+In my project, I use res.write() for every AI-generated chunk and res.end() after the final completion event.
+
+Q9. What is the purpose of res.flushHeaders()?
+
+Answer:
+
+It immediately sends the configured response headers to the client.
+
+In my project, Gemini might take some time to generate the first chunk. So I use res.flushHeaders() to make the browser aware that the SSE response has started without waiting for the first AI-generated text.
+
+Q10. Why do you use \n\n when sending SSE data?
+
+Answer:
+
+In SSE, a blank line indicates the end of an event.
+
+For example:
+data: {"type":"chunk","chunk":"Hello"}
+
+
+The two newline characters terminate the event so the client can identify and process it.
+
+Q11. What is the purpose of Content-Type: text/event-stream?
+
+Answer:
+
+It informs the client that the HTTP response contains an SSE stream rather than a normal JSON response.
+
+Q12. What is the difference between res.json() and res.write()?
+
+Answer:
+
+res.json() sends a JSON response and completes the response.
+
+res.write() writes data to the response without necessarily completing it. We can call it multiple times to stream data progressively.
+Node.js and asynchronous programming questions
+Q13. What is a callback, and how are you using it in your project?
+
+Answer:
+
+A callback is a function passed as an argument to another function so that it can be executed later.
+
+In my project, I pass three callbacks to the AI streaming service:
+- onChunk — receives generated text.
+- onDone — executes when generation finishes.
+- onError — executes when an error occurs.
+This allows the AI service to communicate streaming updates to the Express route.
+
+Q14. What is async/await?
+
+Answer:
+
+async/await is a way of writing asynchronous JavaScript code in a readable manner.
+
+In my project, I use await when calling Gemini and reading the streaming response. It allows the current asynchronous function to wait for an operation to complete without blocking the entire Node.js event loop.
+
+Q15. What is for await...of? Why did you use it?
+
+Answer:
+
+for await...of is used to iterate over asynchronous iterables.
+
+In my project, Gemini returns a readable stream. I use for await...of to read the incoming response chunks one by one as they become available.
+
+This allows me to process the generated text progressively rather than waiting for the complete response.
+
+Q16. Does await block the Node.js event loop?
+
+Answer:
+
+No. await pauses the execution of the current async function until its Promise settles. It does not block the entire Node.js event loop.
+
+Other requests can continue to be handled while the application is waiting for network operations.
+
+Q17. What is a Promise?
+
+Answer:
+
+A Promise represents the eventual result of an asynchronous operation.
+
+It has three states:
+- Pending
+- Fulfilled
+- Rejected
+For example, the fetch() request to Gemini returns a Promise. Once the response is available, the Promise is fulfilled. If the request fails, it can be rejected.
+Frontend streaming questions
+Q18. Why did you use Fetch API instead of EventSource?
+
+Answer:
+
+I used Fetch API because my application needs to send the user's message through a POST request with a JSON request body.
+
+Native EventSource is primarily designed for GET requests and does not support sending a request body or custom request headers in the same way.
+
+Fetch also allows me to access the response stream through response.body.getReader().
+
+Q19. What is ReadableStream?
+
+Answer:
+
+ReadableStream represents data that can be read progressively in smaller pieces.
+
+In my project, the frontend receives the AI response as a readable stream. I use getReader() and reader.read() to read incoming data progressively.
+
+Q20. Why do you use TextDecoder?
+
+Answer:
+
+The browser receives stream data as bytes. TextDecoder converts those bytes into readable text.
+
+I also use { stream: true } to correctly handle characters that might be split across multiple reads.
+
+Q21. Why do you maintain a buffer in the frontend?
+
+Answer:
+
+Because the browser's network reads do not necessarily align with SSE event boundaries.
+
+An event may arrive in multiple reads. So I maintain a buffer, append incoming text, and process only complete events separated by a blank line.
+
+This prevents parsing incomplete JSON data.
+
+Q22. What happens if the AI provider returns an error?
+
+Answer:
+
+My AI service catches the error and invokes the onError callback. The Express route sends an SSE event with type: "error" and closes the response.
+
+The frontend checks the event type and displays the error.
+Advanced and scenario-based questions
+Q23. What happens if multiple users send requests simultaneously?
+
+Answer:
+
+Each request gets its own request and response objects, and request-specific variables such as fullResponse are kept separately.
+
+Node.js handles network I/O asynchronously, so it can manage multiple active streaming requests without waiting for one user to finish before starting another.
+
+However, the actual concurrency is limited by resources, provider rate limits, connection limits and application configuration.
+
+Q24. What happens if the user closes the browser while the AI is generating a response?
+
+Answer:
+
+The browser connection gets closed. Ideally, the backend should detect the disconnection and cancel the ongoing Gemini request using an AbortController.
+
+This prevents unnecessary AI processing and resource consumption.
+
+Q25. What happens if a network chunk contains incomplete JSON?
+
+Answer:
+
+A network chunk does not necessarily represent a complete SSE event.
+
+I need to maintain a buffer and wait until I receive a complete event, identified by the SSE event separator. Then I can safely parse its JSON.
+
+Q26. Can SSE send images or PDF files directly?
+
+Answer:
+
+SSE is designed for text-based event data. For files, I would normally send file metadata or a download URL through SSE and provide a separate HTTP endpoint to download the actual file.
+
+Q27. How would you handle slow frontend clients?
+
+Answer:
+
+I would consider backpressure handling.
+
+In Node.js, res.write() returns false when the writable buffer is full. In that case, I should wait for the drain event before writing more data.
+
+This prevents the backend from continuously writing faster than the client can receive.
+
+Q28. How would you make this application production-ready?
+
+Answer:
+
+I would focus on:
+1. Authentication and authorization.
+2. Input validation and rate limiting.
+3. Secure API key management.
+4. Proper SSE parsing.
+5. Client disconnection and upstream cancellation.
+6. Error handling and logging.
+7. Backpressure handling.
+8. Stream timeouts and resource management.
+9. CORS configuration and infrastructure support for streaming.
+
+12. Your interview-ready project explanation
+If an interviewer asks, "Explain how you implemented AI streaming in your Node.js application," you can use this answer:
+In my Node.js application, I implemented AI response streaming using Server-Sent Events, also known as SSE.
+
+The frontend sends the user's question to an Express POST API. The backend validates the message and configures the response headers with Content-Type: text/event-stream.
+
+Then the backend calls the AI service, which sends the user's prompt to Gemini using its streaming API.
+
+Gemini generates the response in multiple chunks. I read those chunks using for await...of and extract the generated text.
+
+Whenever a new chunk arrives, I pass it to a callback. The Express route uses res.write() to forward that chunk to the frontend as an SSE event.
+
+On the frontend, I use Fetch API with response.body.getReader() to read the response progressively. I decode the incoming bytes, maintain a buffer, identify complete SSE events and update the UI whenever a new chunk arrives.
+
+Once Gemini finishes generating the response, the backend sends a final completion event and calls res.end() to close the HTTP response.
+
+The main benefit is that users can see the AI response progressively instead of waiting for the complete response.
+
+
+
+
+13. Quick revision — remember these 10 concepts
+Concept	Remember this
+SSE	Server sends multiple events over one HTTP response
+text/event-stream	Identifies the response as SSE
+flushHeaders()	Sends headers immediately
+res.write()	Sends a piece of response data
+res.end()	Closes the response
+\n\n	Marks the end of an SSE event
+for await...of	Reads asynchronous stream chunks
+getReader()	Reads the browser response stream
+TextDecoder	Converts bytes into text
+Buffer	Stores incomplete SSE events until they can be processed
+
+
+
+How Gemini sends chunks to your backend.
+How your backend forwards chunks to the browser.
+How your frontend identifies and displays each chunk.
+
+1. How does Gemini send chunks to your backend?
+Interview answer
+"When the user sends a message, my Node.js backend sends that message to Gemini using its streaming API.
+
+I use the streamGenerateContent endpoint with alt=sse, which allows Gemini to return its response as Server-Sent Events.
+
+Instead of waiting for the complete response, my backend reads the incoming stream using for await...of.
+
+Whenever a new chunk arrives, I extract the generated text from Gemini's response and pass it to my callback function."
+
+Understand it with your code:
+const response = await fetch(url, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(body)
+});
+
+
+This sends the request to Gemini.
+for await (const chunk of response.body) {
+  const chunkText = chunk.toString();
+}
+
+
+This continuously reads the incoming stream.
+const parsed = JSON.parse(jsonStr);
+
+const text =
+  parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+
+if (text) onChunk(text);
+
+
+This extracts the AI-generated text and passes it to your callback.
+
+Real-time example:
+
+Gemini might generate:
+Chunk 1: Node.js
+Chunk 2: is
+Chunk 3: a JavaScript runtime.
+
+
+Your backend receives these pieces progressively.
+
+2. How does your backend forward chunks to the browser?
+Interview answer
+"After receiving each chunk from Gemini, I pass it to the onChunk callback in my Express route.
+
+Inside that callback, I convert the chunk into JSON format and use res.write() to send it to the browser as an SSE event.
+
+I use the data: field and a double newline to follow the SSE event format.
+
+I continue sending chunks using res.write() while keeping the HTTP response open. Once Gemini finishes generating the response, I send a completion event and call res.end()."
+
+Understand it with your code:
+(chunk) => {
+  fullResponse += chunk;
+
+  const sseData = JSON.stringify({
+    chunk,
+    type: 'chunk'
+  });
+
+  res.write(`data: ${sseData}\n\n`);
+}
+
+
+Suppose the callback receives:
+chunk = "Node.js";
+
+
+Your backend sends:
+data: {"chunk":"Node.js","type":"chunk"}
+
+
+The next chunk might be:
+data: {"chunk":" is a runtime","type":"chunk"}
+
+
+Both events are sent through the same HTTP response.
+
+When streaming finishes:
+res.write(`data: ${doneData}\n\n`);
+res.end();
+
+
+The done event tells the frontend that generation is complete. res.end() closes the response.
+
+3. How does your frontend identify and display each chunk?
+Interview answer
+"On the frontend, I use the Fetch API to call my streaming POST endpoint.
+
+I access the response stream using response.body.getReader() and use TextDecoder to convert the incoming bytes into readable text.
+
+Since network chunks may not contain complete SSE events, I maintain a buffer and split the data using the SSE event separator, which is a double newline.
+
+After identifying a complete event, I remove the data: prefix and parse the JSON.
+
+I check the event type. If it is a chunk event, I append the received text to the existing response and update the UI. If it is a done event, I stop the loading state."
+
+Understand it with your code:
+
+First, get the stream reader:
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+
+Read incoming data:
+const { done, value } = await reader.read();
+
+
+Convert bytes into text:
+const text = decoder.decode(value, {
+  stream: true
+});
+
+
+Maintain the buffer:
+buffer += text;
+
+
+Separate complete events:
+const messages = buffer.split('\n\n');
+buffer = messages[messages.length - 1];
+
+
+Parse the event:
+const parsed = JSON.parse(jsonStr);
+
+
+Identify the event:
+if (parsed.type === 'chunk') {
+  fullResponse += parsed.chunk;
+  responseDiv.textContent = fullResponse;
+}
+
+
+The frontend keeps appending the new text, so users see the answer appearing progressively.
+
+4. Understand all three together
+Example: User asks "What is Node.js?"
+Step 1 — Gemini to backend
+
+Gemini generates three pieces
+
+Node.js →  is a →  JavaScript runtime.
+
+
+Step 2 — Backend to browser
+
+Express sends each piece using res.write()
+
+data: {"chunk":"Node.js","type":"chunk"}
+
+data: {"chunk":" is a","type":"chunk"}
+
+data: {"chunk":" JavaScript runtime.","type":"chunk"}
+
+
+Step 3 — Browser displays the answer
+
+Frontend parses events and appends each chunk
+Node.js is a JavaScript runtime.
+
+One combined answer for an interviewer
+If the interviewer asks you to explain the complete streaming flow, use this answer:
+In my application, the AI streaming flow has three main steps.
+
+First, the frontend sends the user's question to my Node.js backend. The backend sends that question to Gemini using its streaming API. I read Gemini's response using `for await...of` and extract the generated text from each incoming chunk.
+
+Second, I pass each chunk to a callback in my Express route. There, I convert it into JSON and use `res.write()` to forward it to the browser as an SSE event. I keep the HTTP response open until Gemini finishes.
+
+Third, on the frontend, I use Fetch API and `response.body.getReader()` to read the incoming stream. I decode the data, identify complete SSE events, parse their JSON and append each received chunk to the UI.
+
+Finally, when the backend sends the completion event, the frontend knows that the AI response is complete.
